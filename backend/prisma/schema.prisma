@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Devices {
+  id              Int         @id @default(autoincrement())
+  Name            String
+  PinNumber       Int
+  allowedDevices  Boolean
+  Lab             Lab[]
+  commands        Command[]   @relation("SingleDeviceCommands")
+  multiCommands   Command[]   @relation("MultiDeviceCommands")
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Command {
+  id           Int        @id @default(autoincrement())
+  userId       Int
+  deviceId     Int?
+  command      String
+  status       String
+  requestedAt  DateTime   @default(now())
+  completedAt  DateTime?
+
+  // single-device fast path
+  Device       Devices?   @relation("SingleDeviceCommands", fields: [deviceId], references: [id])
+
+  // multi-device when needed
+  devices      Devices[]  @relation("MultiDeviceCommands")
+}
+
+model Lab {
+  id         Int        @id @default(autoincrement())
+  name       String
+  Devices    Devices[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model user {
+  id         Int       @id @default(autoincrement())
+  name       String
+  role       Role
+  IDnumber   String
+  email      String
+  password   String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  accountVerified        Boolean   @default(false)
+  emailverificationCode  String?
+  emailverified          Boolean   @default(false)
+  verificationCodeExpire String?
+}
+
+enum Role {
+  ADMIN
+  STUDENT
+  FACULTY
+}
+
