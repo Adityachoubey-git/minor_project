@@ -154,13 +154,14 @@ export const handleRegister = catchAsyncError(
       const verificationCodeExpire = Date.now() + 24 * 60 * 60 * 1000;
 
       const user = await createUser(
-        Idnumber,
-        name,
-        role,
-        email,
-        hashedPassword,
-        emailverificationCode,
-        verificationCodeExpire.toString()
+                      name,
+                      email,
+                      Idnumber,
+                      role,
+                      hashedPassword,
+                      emailverificationCode,
+                      verificationCodeExpire.toString()
+
       );
 
       await sendEmailVerificationCode(email, emailverificationCode);

@@ -2,8 +2,9 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth";
-
-
+import labRouter from "./routes/lab";
+import deviceRouter from"./routes/devices";
+import relayRoutes from "./routes/relay";
 const app = express();
 const PORT =3000;
 
@@ -29,6 +30,9 @@ app.get("/home", (req, res) => {
 });
 // Routers
  app.use('/auth', authRouter) 
+app.use ('/lab',labRouter)
+app.use('/devices', deviceRouter);
+app.use("/relay", relayRoutes);
 
 
 // 404 handler
@@ -43,5 +47,5 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
+  console.log(`🚀 Server running at http://192.168.230.115:${PORT}`);
 });

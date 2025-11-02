@@ -17,9 +17,11 @@ datasource db {
 model Devices {
   id              Int         @id @default(autoincrement())
   Name            String
-  PinNumber       Int
+  PinNumber       Int @unique
   allowedDevices  Boolean
-  Lab             Lab[]
+  labId           Int
+  value Boolean  @default(false)
+  Lab             Lab   @relation(fields: [labId], references: [id])
   commands        Command[]   @relation("SingleDeviceCommands")
   multiCommands   Command[]   @relation("MultiDeviceCommands")
   createdAt       DateTime    @default(now())
