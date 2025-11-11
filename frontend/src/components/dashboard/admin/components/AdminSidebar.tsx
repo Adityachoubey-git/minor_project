@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, Settings, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Users, Settings, BarChart3, Building2, Wrench } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -9,9 +9,10 @@ export function AdminSidebar() {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-    { icon: Users, label: "Users", href: "/dashboard/admin/users" },
-    { icon: BarChart3, label: "Analytics", href: "/dashboard/admin/analytics" },
-    { icon: Settings, label: "Settings", href: "/dashboard/admin/settings" },
+    {icon: Building2, label: " Manage Lab", href: "/dashboard/labs" },
+    { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
+    { icon: Wrench, label: "Devices Management", href: "/dashboard/devices" },
+
   ]
 
   return (

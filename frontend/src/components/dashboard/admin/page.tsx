@@ -6,9 +6,8 @@ import { Users, Settings, Activity, AlertCircle } from "lucide-react"
 import { Header } from "@/components/header"
 export default function AdminDashboard() {
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <Header/>
+    <div className="space-y-8 m-10">
+  
       <div>
         <h1 className="text-3xl font-bold">Admin Console</h1>
         <p className="text-muted-foreground mt-2">Manage system, users, and IoT devices</p>
