@@ -5,10 +5,14 @@ import { NextFunction,Request,Response } from "express";
 import ErrorHandler from "../middlewares/error";
 import { catchAsyncError } from "../middlewares/catchAsyncError";
 import prisma from "../db/db";
-import { createAdmin, createUser, findAdmin, userEmailExists } from "../repository/auth.repo";
+import { createAdmin, createUser, findAdmin, findUserByEmail, isUserEmailVerified, saveEmailVerificationCode, updateNewPassword, updateTokenandExpiry, userEmailExists } from "../repository/auth.repo";
 import { sendToken } from "../utils/SendToken";
 import { generateEmailTemplate } from "../utils/EmailTemplate";
 import { sendEmail } from "../utils/SendEmail";
+import { randomBytes } from "crypto";
+import dotenv from "dotenv";
+dotenv.config();
+const frontendURL = process.env.FRONTEND_BASE_URL;
 
 
 
@@ -26,14 +30,15 @@ const sendEmailVerificationCode = async (
 
   const message = generateEmailTemplate(verificationCode);
   const subject = "Verification Code";
+  console.log("otp",verificationCode);
   try {
     await sendEmail(email, subject, message);
     console.log("mail sent ")
-  } catch (err) {
-    console.log("Email could not be sent", err);
-
-    return new ErrorHandler("Email could not be sent", 500);
-  }
+  } // inside sendEmailVerificationCode
+catch (err) {
+  console.log("Email could not be sent", err)
+  throw new ErrorHandler("Email could not be sent", 500)
+}
 };
 
 
@@ -257,3 +262,175 @@ export const logout = catchAsyncError(async (req, res, next) => {
       message: "Logged out successfully.",
     });
 });
+export const handleGetUserProfile = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return next(new ErrorHandler("User not found.", 401));
+      }
+
+      // This new query explicitly selects all the fields your frontend needs, including rfid.
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          IDnumber: true,
+          role: true,
+         
+          
+          verificationCodeExpire: true,
+          emailverificationCode: true,
+          emailverified: true,
+          
+          }},
+         
+          // Add other profiles if needed by your UserContext
+        
+      );
+
+     
+      
+      // We manually combine the nested profile into a single 'profile' object
+      // to match what your frontend's useUser context expects.
+
+      const responseUser = {
+        ...user,
+        
+      };
+
+      res.status(200).json({
+        success: true,
+        user: responseUser,
+      });
+    } catch (error) {
+      return next(new ErrorHandler("Internal Server Error.", 500));
+    }
+  }
+)
+
+export const handleForgotPassword = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.body;
+
+    try {
+      if (!email) {
+        return next(new ErrorHandler("Please provide email", 400));
+      }
+
+      const user = await userEmailExists(email);
+      if (!user) {
+        return next(new ErrorHandler("User not found", 400));
+      }
+
+      const token = randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 3600000);
+
+      await updateTokenandExpiry(email, {
+        resetToken: token,
+        resetTokenExpiry: expiry,
+      });
+
+
+const resetLink = `${frontendURL}/reset-password?token=${token}&email=${email}`;
+      console.log(resetLink);
+
+      const subject = "Password Reset Request";
+      const message = `Click <a href="${resetLink}">here</a> to reset your password.`;
+
+      await sendEmail(email, subject, message);
+
+      res.json({ message: "Password reset link sent if that email exists." });
+    } catch (error) {
+      return next(new ErrorHandler("Internal Server Error.", 500));
+    }
+  }
+);
+export const hanldeResetPassword = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { email, token, newPassword } = req.body;
+
+    try {
+      if (!email || !token || !newPassword) {
+        return next(new ErrorHandler("Please provide email", 400));
+      }
+
+      const user = await userEmailExists(email);
+      if (!user || user.resetToken !== token || !user.resetTokenExpiry) {
+        return next(new ErrorHandler("Invalid or expired token.", 400));
+      }
+
+      if (user.resetTokenExpiry < new Date()) {
+        return next(new ErrorHandler("Invalid or expired token.", 400));
+      }
+
+      const hashedPassword = await hashpass(newPassword);
+
+      await updateNewPassword(user.email, hashedPassword);
+
+      res
+        .status(200)
+        .json({ message: "Password has been reset successfully." });
+    } catch (error) {
+      return next(new ErrorHandler("Internal Server Error.", 500));
+    }
+  }
+);
+
+export const resendEmailOTP = catchAsyncError(
+ async (req: Request, res: Response, next: NextFunction) => {
+    const { email } = req.body
+
+    if (!email) {
+      return next(new ErrorHandler("Email is required.", 400))
+    }
+
+    const user = await findUserByEmail(email)
+    if (!user) {
+      return next(new ErrorHandler("User not found.", 404))
+    }
+
+    if (user.role === "ADMIN") {
+      return next(new ErrorHandler("OTP verification not required for admin.", 400))
+    }
+
+    if (isUserEmailVerified(user)) {
+      res.status(200).json({
+        success: true,
+        message: "Email already verified.",
+      })
+      return ;
+    }
+
+    // Optional: throttle resends (e.g., one every 60 seconds)
+    // If you want throttling, uncomment this block:
+    /*
+    if (user.verificationCodeExpire) {
+      const lastExpire = new Date(user.verificationCodeExpire).getTime()
+      const now = Date.now()
+      const RESEND_COOLDOWN_MS = 60 * 1000
+      // If old code still valid and just sent recently, you can block or reuse.
+      if (lastExpire - now > 23 * 60 * 60 * 1000 && now + RESEND_COOLDOWN_MS < lastExpire) {
+        return next(new ErrorHandler("Please wait before requesting another code.", 429))
+      }
+    }
+    */
+
+    // Generate a new code and extend expiry
+    const code = generateVerificationCode().toString()
+    const expireAt = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+    await saveEmailVerificationCode(user.id, code, expireAt)
+
+    // Send mail (throw on failure so catchAsyncError handles it)
+    await sendEmailVerificationCode(user.email, code)
+       res.status(200).json({
+      success: true,
+      message: "Verification code resent to your email.",
+    })
+    return ;
+  }
+)
+

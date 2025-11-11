@@ -6,7 +6,7 @@ import labRouter from "./routes/lab";
 import deviceRouter from"./routes/devices";
 import relayRoutes from "./routes/relay";
 const app = express();
-const PORT =3000;
+const PORT =3001;
 
 app.use(express.json());
 app.use(cors({

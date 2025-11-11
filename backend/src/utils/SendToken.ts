@@ -22,19 +22,19 @@ export const sendToken = (
   };
 
   const token = generateToken();
-  console.log(token,"hey i am token");
+ 
 
   // Send token as cookie (if your app uses cookies)
   res.cookie("token", token, {
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
-  console.log(res.cookie,"this is cookie in response")
+  
 
 
   res.status(statusCode).json({
     success: true,
     message,
-    token,
+
   });
 };

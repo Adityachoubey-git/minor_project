@@ -112,3 +112,57 @@ export async function createAdmin(
   return adminUser;
 }
 
+export const updateTokenandExpiry= async(email:string,data:{
+  resetToken:string,
+  resetTokenExpiry:Date
+})=>{
+
+  return await prisma.user.update({
+    where:{
+      email
+    },
+    data:{
+      resetToken:data.resetToken,
+      resetTokenExpiry:data.resetTokenExpiry
+    }
+  })
+}
+
+
+export const updateNewPassword = async(email:string,newpassword:string)=>{
+  return await prisma.user.update({
+    where:{
+      email
+    },
+    data:{
+      password:newpassword,
+      resetToken:null,
+      resetTokenExpiry:null
+    }
+  })
+}
+
+export const findUserByEmail = async (email: string) => {
+  return prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+  })
+}
+
+export const saveEmailVerificationCode = async (
+  userId: number,
+  code: string,
+  expireAt: Date
+) => {
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      emailverificationCode: code,
+      verificationCodeExpire: expireAt.toISOString(),
+    },
+    select: { id: true, email: true, emailverified: true, role: true },
+  })
+}
+
+export const isUserEmailVerified = (user: { emailverified: boolean }) => {
+  return Boolean(user.emailverified)
+}
