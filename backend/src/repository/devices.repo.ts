@@ -111,10 +111,8 @@ export async function getDevicesRepo({
     whereClause.allowedDevices = allowedDevices;
   }
 
-  if (labId !== undefined) {
-    whereClause.Lab = {
-      some: { id: labId },
-    };
+   if (labId !== undefined) {
+    whereClause.labId = labId;
   }
 
   return prisma.devices.findMany({
@@ -154,10 +152,9 @@ export async function countDevicesRepo({
     whereClause.allowedDevices = allowedDevices;
   }
 
-  if (labId !== undefined) {
-    whereClause.Lab = {
-      some: { id: labId },
-    };
+ 
+   if (labId !== undefined) {
+    whereClause.labId = labId;
   }
 
   return prisma.devices.count({

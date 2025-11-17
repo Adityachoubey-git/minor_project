@@ -166,3 +166,23 @@ export const saveEmailVerificationCode = async (
 export const isUserEmailVerified = (user: { emailverified: boolean }) => {
   return Boolean(user.emailverified)
 }
+
+export const getAdminDashboardStats = async () => {
+  // Parallelize all queries for speed
+  const [totalUsers, totalDevices, totalLabs, totalStudents, totalFaculty] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.devices.count(),
+      prisma.lab.count(),
+      prisma.user.count({ where: { role: "STUDENT" } }),
+      prisma.user.count({ where: { role: "FACULTY" } }),
+    ])
+
+  return {
+    totalUsers,
+    totalDevices,
+    totalLabs,
+    totalStudents,
+    totalFaculty,
+  }
+}

@@ -5,6 +5,9 @@ import authRouter from "./routes/auth";
 import labRouter from "./routes/lab";
 import deviceRouter from"./routes/devices";
 import relayRoutes from "./routes/relay";
+import { processAlarmsHandler } from "./controllers/alram.controllers";
+import cron from "node-cron"
+import alarmRoutes from "./routes/alarm";
 const app = express();
 const PORT =3001;
 
@@ -16,7 +19,13 @@ app.use(cors({
 app.use(cookieParser());
 
 console.log("starting backend");
-
+cron.schedule("* * * * *", async () => {
+  try {
+    await processAlarmsHandler({} as any, { status: () => ({ json: () => null }) } as any, () => {})
+  } catch (err) {
+    console.log("Alarm processor error:", err)
+  }
+})
 // Log all incoming requests
 app.use((req, _res, next) => {
   console.log(`[REQ] ${req.method} ${req.url}`);
@@ -33,7 +42,7 @@ app.get("/home", (req, res) => {
 app.use ('/lab',labRouter)
 app.use('/devices', deviceRouter);
 app.use("/relay", relayRoutes);
-
+app.use("/alarms", alarmRoutes);
 
 // 404 handler
 app.use((req, res) => res.status(404).json({ error: "Not found" }));

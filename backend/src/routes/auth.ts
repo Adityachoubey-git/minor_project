@@ -2,8 +2,9 @@ import "express";
 
 import express from "express";
 import "dotenv/config";
-import { emailVerifyOTP, handleForgotPassword, handleGetUserProfile, handleRegister, hanldeResetPassword, login, logout, resendEmailOTP, SeedAdmin } from "../controllers/auth.controllers";
+import { emailVerifyOTP, getAdminStats, handleForgotPassword, handleGetUserProfile, handleRegister, hanldeResetPassword, login, logout, resendEmailOTP, SeedAdmin } from "../controllers/auth.controllers";
 import { isAuthenticated } from "../middlewares/authMiddleware";
+import { IsAdmin } from "../middlewares/IsAdmin";
 const router =express.Router();
 
 
@@ -26,6 +27,8 @@ router.post("/logout",isAuthenticated,logout)
 //feed admin
 router.post("/feedadmin", SeedAdmin);
 
-
+//dashboard count
+// ✅ Admin-only route
+router.get("/admin/stats", isAuthenticated,IsAdmin, getAdminStats)
 
 export default  router;

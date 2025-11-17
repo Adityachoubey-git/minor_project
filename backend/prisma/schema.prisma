@@ -68,6 +68,8 @@ model user {
    resetToken             String?
   resetTokenExpiry       DateTime?
   last_login             DateTime? @default(now()) @db.Timestamp(6)
+
+  alarms Alarm[]
 }
 
 enum Role {
@@ -76,3 +78,14 @@ enum Role {
   FACULTY
 }
 
+model Alarm {
+  id          Int        @id @default(autoincrement())
+  userId      Int
+  deviceIds   String     // JSON string like "[1,2,3]"
+  state       String     // 'on' | 'off'
+  scheduledAt DateTime
+  executed    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+
+  user        user       @relation(fields: [userId], references: [id])
+}

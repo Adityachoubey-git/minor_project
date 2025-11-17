@@ -5,7 +5,7 @@ import { NextFunction,Request,Response } from "express";
 import ErrorHandler from "../middlewares/error";
 import { catchAsyncError } from "../middlewares/catchAsyncError";
 import prisma from "../db/db";
-import { createAdmin, createUser, findAdmin, findUserByEmail, isUserEmailVerified, saveEmailVerificationCode, updateNewPassword, updateTokenandExpiry, userEmailExists } from "../repository/auth.repo";
+import { createAdmin, createUser, findAdmin, findUserByEmail, getAdminDashboardStats, isUserEmailVerified, saveEmailVerificationCode, updateNewPassword, updateTokenandExpiry, userEmailExists } from "../repository/auth.repo";
 import { sendToken } from "../utils/SendToken";
 import { generateEmailTemplate } from "../utils/EmailTemplate";
 import { sendEmail } from "../utils/SendEmail";
@@ -434,3 +434,31 @@ export const resendEmailOTP = catchAsyncError(
   }
 )
 
+export const getAdminStats = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // Assuming req.user is attached via middleware (auth + JWT)
+    const userId = (req as any).user?.id
+
+    if (!userId) {
+      return next(new ErrorHandler("Unauthorized: Missing user ID", 401))
+    }
+
+    // Verify admin role from DB
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    })
+
+    if (!user || user.role !== "ADMIN") {
+      return next(new ErrorHandler("Access denied: Admins only", 403))
+    }
+
+    const stats = await getAdminDashboardStats()
+
+    res.status(200).json({
+      success: true,
+      message: "Admin dashboard statistics fetched successfully.",
+      stats,
+    })
+  }
+)
