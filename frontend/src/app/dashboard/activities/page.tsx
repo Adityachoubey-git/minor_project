@@ -15,10 +15,11 @@ interface CommandLog {
   id: number
   deviceId: number
   userId: number
-  action: string
-  state: string
-  timestamp: string
-  Device?: { id: number; Name: string }
+  command: string          // was: action
+  status: string           // was: state
+  requestedAt: string      // was: timestamp
+  completedAt: string | null
+  Device?: { id?: number; Name: string; PinNumber: number }
   User?: { id: number; name: string; email: string; role: string }
 }
 interface Device {
@@ -45,6 +46,7 @@ export default function ActivitiesPage() {
       try {
         const response = await axios.get(`${Base_Url}/devices/get`, {
           params: { limit: 100 },
+          withCredentials:true
         })
         if (response.data.success) {
           setDevices(response.data.devices)
@@ -86,41 +88,43 @@ export default function ActivitiesPage() {
     fetchActivities()
   }, [fetchActivities])
 
-  const handleExport = async () => {
-    try {
-      const response = await axios.get(`${Base_Url}/relay/history/all`, {
-        params: { limit: 10000 },withCredentials:true
-      })
+const handleExport = async () => {
+  try {
+    const response = await axios.get(`${Base_Url}/relay/history/all`, {
+      params: { limit: 10000 },
+      withCredentials: true,
+    })
 
-      if (response.data.success) {
-        const csvContent = [
-          ["Timestamp", "Device", "User", "Email", "Role", "Action", "State"],
-          ...response.data.logs.map((log: CommandLog) => [
-            new Date(log.timestamp).toLocaleString(),
-            log.Device?.Name || "Unknown",
-            log.User?.name || "Unknown",
-            log.User?.email || "N/A",
-            log.User?.role || "N/A",
-            log.action,
-            log.state,
-          ]),
-        ]
-          .map((row) => row.map((cell:any) => `"${cell}"`).join(","))
-          .join("\n")
+    if (response.data.success) {
+      const csvContent = [
+        ["Timestamp", "Device", "User", "Email", "Role", "Command", "Status"],
+        ...response.data.logs.map((log: CommandLog) => [
+          new Date(log.requestedAt).toLocaleString(), // was log.timestamp
+          log.Device?.Name || "Unknown",
+          log.User?.name || "Unknown",
+          log.User?.email || "N/A",
+          log.User?.role || "N/A",
+          log.command, // was log.action
+          log.status,  // was log.state
+        ]),
+      ]
+        .map((row) => row.map((cell: any) => `"${cell}"`).join(","))
+        .join("\n")
 
-        const blob = new Blob([csvContent], { type: "text/csv" })
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `activities-${new Date().toISOString().split("T")[0]}.csv`
-        a.click()
-        window.URL.revokeObjectURL(url)
-      }
-    } catch (err: any) {
-      setError("Failed to export data")
-      console.error("[v0] Error exporting data:", err)
+      const blob = new Blob([csvContent], { type: "text/csv" })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `activities-${new Date().toISOString().split("T")[0]}.csv`
+      a.click()
+      window.URL.revokeObjectURL(url)
     }
+  } catch (err: any) {
+    setError("Failed to export data")
+    console.error("[v0] Error exporting data:", err)
   }
+}
+
 
   return (
     <div className="space-y-8 m-10">
@@ -216,44 +220,66 @@ export default function ActivitiesPage() {
           ) : (
             <div className="border rounded-lg overflow-hidden">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>Device</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>State</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell className="text-sm">{new Date(log.timestamp).toLocaleString()}</TableCell>
-                      <TableCell className="font-medium">{log.Device?.Name || "Unknown"}</TableCell>
-                      <TableCell>{log.User?.name || "Unknown"}</TableCell>
-                      <TableCell className="text-sm">{log.User?.email || "N/A"}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {log.User?.role || "N/A"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="font-medium text-sm">{log.action}</TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            log.state === "on"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                          }`}
-                        >
-                          {log.state}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
+               <TableHeader>
+  <TableRow>
+    <TableHead>Timestamp</TableHead>
+    <TableHead>Device</TableHead>
+    <TableHead>User</TableHead>
+    <TableHead>Email</TableHead>
+    <TableHead>Role</TableHead>
+    <TableHead>Command</TableHead> {/* was Action */}
+    <TableHead>Status</TableHead>  {/* was State */}
+  </TableRow>
+</TableHeader>
+             <TableBody>
+  {logs.map((log) => (
+    <TableRow key={log.id}>
+      {/* Timestamp */}
+      <TableCell className="text-sm">
+        {new Date(log.requestedAt).toLocaleString()}
+      </TableCell>
+
+      {/* Device */}
+      <TableCell className="font-medium">
+        {log.Device?.Name || "Unknown"}
+      </TableCell>
+
+      {/* User */}
+      <TableCell>{log.User?.name || "Unknown"}</TableCell>
+
+      {/* Email */}
+      <TableCell className="text-sm">
+        {log.User?.email || "N/A"}
+      </TableCell>
+
+      {/* Role */}
+      <TableCell>
+        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          {log.User?.role || "N/A"}
+        </span>
+      </TableCell>
+
+      {/* Command */}
+      <TableCell className="font-medium text-sm">
+        {log.command}
+      </TableCell>
+
+      {/* Status (success/failed) */}
+      <TableCell>
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            log.status === "success"
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+          }`}
+        >
+          {log.status}
+        </span>
+      </TableCell>
+    </TableRow>
+  ))}
+</TableBody>
+
               </Table>
             </div>
           )}
