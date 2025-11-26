@@ -11,7 +11,7 @@ const router = express.Router();
 router.post("/create", isAuthenticated,IsAdmin, createLabHandler);
 router.put("/labEdit/:id", isAuthenticated,IsAdmin, editLabHandler);
 router.delete("/delete/:id", isAuthenticated,IsAdmin, deleteLabHandler);
-router.get("/get",isAuthenticated, getLabsHandler);
+router.get("/get", getLabsHandler);//router.get("/get",isAuthenticated, getLabsHandler);
 
 
 export default router;

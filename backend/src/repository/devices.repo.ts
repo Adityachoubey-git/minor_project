@@ -6,6 +6,7 @@ interface CreateDeviceInput {
   PinNumber: number;
   allowedDevices: boolean;
   labId: number;
+  studentAllowed :boolean
 }
 
 // ✅ Create device and connect to a lab
@@ -16,6 +17,7 @@ export async function createDeviceRepo(data: CreateDeviceInput) {
       PinNumber: data.PinNumber,
       allowedDevices: data.allowedDevices,
      labId: data.labId,
+     studentAllowed:data.studentAllowed
     },
     include: {
       Lab: true,
@@ -48,6 +50,7 @@ export async function updateDeviceRepo(
     PinNumber?: number;
     allowedDevices?: boolean;
     labId?: number;
+    studentAllowed?:boolean;
   }
 ) {
   const updateData: any = {};
@@ -55,6 +58,7 @@ export async function updateDeviceRepo(
   if (data.Name !== undefined) updateData.Name = data.Name;
   if (data.PinNumber !== undefined) updateData.PinNumber = data.PinNumber;
   if (data.allowedDevices !== undefined) updateData.allowedDevices = data.allowedDevices;
+   if (data.studentAllowed !== undefined) updateData.studentAllowed = data.studentAllowed;
   if (data.labId !== undefined) {
     updateData.Lab = {
       set: [{ id: data.labId }], // replaces existing lab association
@@ -83,6 +87,7 @@ interface DeviceQuery {
   allowedDevices?: boolean;
   skip?: number;
   limit?: number;
+  studentAllowed?:boolean;
 }
 
 // ✅ Get Devices with filters + pagination
@@ -93,6 +98,7 @@ export async function getDevicesRepo({
   allowedDevices,
   skip = 0,
   limit = 10,
+  studentAllowed
 }: DeviceQuery) {
   const whereClause: any = {};
 
@@ -109,6 +115,9 @@ export async function getDevicesRepo({
 
   if (allowedDevices !== undefined) {
     whereClause.allowedDevices = allowedDevices;
+  }
+    if (studentAllowed !== undefined) {
+    whereClause.studentAllowed = studentAllowed;
   }
 
    if (labId !== undefined) {
@@ -162,3 +171,14 @@ export async function countDevicesRepo({
   });
 }
 
+export async function getDevicesByLabIdRepo(labId: number) {
+  return prisma.devices.findMany({
+    where: { labId },
+    include: {
+      Lab: true, // optional, remove if you don't need lab data here
+    },
+    orderBy: {
+      id: "asc",
+    },
+  });
+}

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/context/theme-context"
+import { Toaster } from "react-hot-toast"
 
 import { UserProvider } from "@/context/UserContext"
 
@@ -45,6 +46,7 @@ export default function RootLayout({
         <ThemeProvider>
           <UserProvider>
           {children}
+            <Toaster position="top-right" /> {/* 👈 required */}
           </UserProvider>
         </ThemeProvider>
         <Analytics />

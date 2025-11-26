@@ -1,6 +1,6 @@
 import express from "express";
 import { isAuthenticated } from "../middlewares/authMiddleware";
-import { createDeviceHandler, deleteDeviceHandler, editDeviceHandler, getDevicesHandler } from "../controllers/devices.controller";
+import { createDeviceHandler, deleteDeviceHandler, editDeviceHandler, getDevicesByLabHandler, getDevicesHandler } from "../controllers/devices.controller";
 import { IsAdmin } from "../middlewares/IsAdmin";
 
 
@@ -11,7 +11,8 @@ router.post("/create", isAuthenticated,IsAdmin,createDeviceHandler);
 
 router.put("/deviceEdit/:id", isAuthenticated,IsAdmin, editDeviceHandler);
 router.delete("/deviceDelete/:id", isAuthenticated,IsAdmin, deleteDeviceHandler);
-router.get("/get",isAuthenticated, getDevicesHandler);
+router.get("/get", getDevicesHandler);//router.get("/get",isAuthenticated, getDevicesHandler);
+router.get("/lab/:labId", getDevicesByLabHandler);
 
 
 

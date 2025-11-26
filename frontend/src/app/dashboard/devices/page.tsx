@@ -27,12 +27,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Trash2, Edit2, Search, Power, Zap } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import toast from "react-hot-toast" // ✅ hot-toast
 
 interface Device {
   id: number
   Name: string
   PinNumber: number
   allowedDevices: boolean
+  studentAllowed: boolean
   labId: number
   Lab: { id: number; name: string } | null
   createdAt: string
@@ -41,6 +43,14 @@ interface Device {
 interface Lab {
   id: number
   name: string
+}
+
+interface DeviceFormData {
+  Name: string
+  PinNumber: string
+  labId: string
+  allowedDevices: boolean
+  studentAllowed: boolean
 }
 
 export default function DevicesManagement() {
@@ -57,11 +67,13 @@ export default function DevicesManagement() {
   const [deviceStates, setDeviceStates] = useState<{ [key: number]: boolean }>({})
   const [togglingDevice, setTogglingDevice] = useState<number | null>(null)
   const [error, setError] = useState("")
-  const [formData, setFormData] = useState({
+
+  const [formData, setFormData] = useState<DeviceFormData>({
     Name: "",
     PinNumber: "",
     labId: "",
     allowedDevices: true,
+    studentAllowed: true,
   })
 
   const limit = 10
@@ -70,7 +82,8 @@ export default function DevicesManagement() {
     const fetchLabs = async () => {
       try {
         const response = await axios.get(`${Base_Url}/lab/get`, {
-          params: { limit: 100 },withCredentials:true
+          params: { limit: 100 },
+          withCredentials: true,
         })
         if (response.data.success) {
           setLabs(response.data.labs)
@@ -92,7 +105,7 @@ export default function DevicesManagement() {
           limit,
           search,
         },
-        withCredentials:true,
+        withCredentials: true,
       })
 
       if (response.data.success) {
@@ -102,7 +115,9 @@ export default function DevicesManagement() {
         await fetchDeviceStates(response.data.devices)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch devices")
+      const msg = err.response?.data?.message || "Failed to fetch devices"
+      setError(msg)
+      toast.error(`Error fetching devices: ${msg}`)
       console.error("[v0] Error fetching devices:", err)
     } finally {
       setLoading(false)
@@ -112,9 +127,13 @@ export default function DevicesManagement() {
   const fetchDeviceStates = async (devicesToCheck: Device[]) => {
     try {
       const pins = devicesToCheck.map((d) => d.PinNumber)
-      const response = await axios.post(`${Base_Url}/relay/live-state`, {
-        pins,
-      },{ withCredentials:true })
+      const response = await axios.post(
+        `${Base_Url}/relay/live-state`,
+        {
+          pins,
+        },
+        { withCredentials: true },
+      )
 
       if (response.data.success) {
         const statesMap: { [key: number]: boolean } = {}
@@ -137,28 +156,46 @@ export default function DevicesManagement() {
 
   const handleCreateDevice = async () => {
     if (!formData.Name.trim() || !formData.PinNumber || !formData.labId) {
-      setError("Name, Pin Number, and Lab are required")
+      const msg = "Name, Pin Number, and Lab are required"
+      setError(msg)
+      toast.error(msg) // ✅ validation toast
       return
     }
 
     setLoading(true)
     try {
-      const response = await axios.post(`${Base_Url}/devices/create`, {
-        Name: formData.Name,
-        PinNumber: Number.parseInt(formData.PinNumber),
-        labId: Number.parseInt(formData.labId),
-        allowedDevices: formData.allowedDevices,
-       
-      },{ withCredentials:true })
+      const response = await axios.post(
+        `${Base_Url}/devices/create`,
+        {
+          Name: formData.Name,
+          PinNumber: Number.parseInt(formData.PinNumber),
+          labId: Number.parseInt(formData.labId),
+          allowedDevices: formData.allowedDevices,
+          studentAllowed: formData.studentAllowed,
+        },
+        { withCredentials: true },
+      )
 
       if (response.data.success) {
-        setFormData({ Name: "", PinNumber: "", labId: "", allowedDevices: true })
+        const createdName = formData.Name
+
+        setFormData({
+          Name: "",
+          PinNumber: "",
+          labId: "",
+          allowedDevices: true,
+          studentAllowed: true,
+        })
         setIsCreateOpen(false)
         setPage(1)
         await fetchDevices()
+
+        toast.success(`Device "${createdName}" created successfully`) // ✅
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to create device")
+      const msg = err.response?.data?.message || "Failed to create device"
+      setError(msg)
+      toast.error(`Error creating device: ${msg}`) // ✅
       console.error("[v0] Error creating device:", err)
     } finally {
       setLoading(false)
@@ -167,28 +204,46 @@ export default function DevicesManagement() {
 
   const handleEditDevice = async () => {
     if (!formData.Name.trim() || !formData.PinNumber || !formData.labId || !selectedDevice) {
-      setError("Name, Pin Number, and Lab are required")
+      const msg = "Name, Pin Number, and Lab are required"
+      setError(msg)
+      toast.error(msg) // ✅ validation toast
       return
     }
 
     setLoading(true)
     try {
-      const response = await axios.put(`${Base_Url}/devices/deviceEdit/${selectedDevice.id}`, {
-        Name: formData.Name,
-        PinNumber: Number.parseInt(formData.PinNumber),
-        labId: Number.parseInt(formData.labId),
-        allowedDevices: formData.allowedDevices,
-        withCredentials:true,
-      })
+      const response = await axios.put(
+        `${Base_Url}/devices/deviceEdit/${selectedDevice.id}`,
+        {
+          Name: formData.Name,
+          PinNumber: Number.parseInt(formData.PinNumber),
+          labId: Number.parseInt(formData.labId),
+          allowedDevices: formData.allowedDevices,
+          studentAllowed: formData.studentAllowed,
+        },
+        { withCredentials: true },
+      )
 
       if (response.data.success) {
-        setFormData({ Name: "", PinNumber: "", labId: "", allowedDevices: true })
+        const updatedName = formData.Name
+
+        setFormData({
+          Name: "",
+          PinNumber: "",
+          labId: "",
+          allowedDevices: true,
+          studentAllowed: true,
+        })
         setSelectedDevice(null)
         setIsEditOpen(false)
         await fetchDevices()
+
+        toast.success(`Device "${updatedName}" updated successfully`) // ✅
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to edit device")
+      const msg = err.response?.data?.message || "Failed to edit device"
+      setError(msg)
+      toast.error(`Error updating device: ${msg}`) // ✅
       console.error("[v0] Error editing device:", err)
     } finally {
       setLoading(false)
@@ -200,16 +255,24 @@ export default function DevicesManagement() {
 
     setLoading(true)
     try {
-      const response = await axios.delete(`${Base_Url}/devices/deviceDelete/${selectedDevice.id}`,{ withCredentials:true})
+      const name = selectedDevice.Name
+
+      const response = await axios.delete(`${Base_Url}/devices/deviceDelete/${selectedDevice.id}`, {
+        withCredentials: true,
+      })
 
       if (response.data.success) {
         setSelectedDevice(null)
         setIsDeleteOpen(false)
         setPage(1)
         await fetchDevices()
+
+        toast.success(`Device "${name}" deleted successfully`) // ✅
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to delete device")
+      const msg = err.response?.data?.message || "Failed to delete device"
+      setError(msg)
+      toast.error(`Error deleting device: ${msg}`) // ✅
       console.error("[v0] Error deleting device:", err)
     } finally {
       setLoading(false)
@@ -220,22 +283,33 @@ export default function DevicesManagement() {
     setTogglingDevice(device.id)
     try {
       const newState = deviceStates[device.id] ? "off" : "on"
-      const response = await axios.post(`${Base_Url}/relay/control`, {
-        deviceIds: [device.id],
-        state: newState,
-    
-      },   { withCredentials:true})
+      const response = await axios.post(
+        `${Base_Url}/relay/control`,
+        {
+          deviceIds: [device.id],
+          state: newState,
+        },
+        { withCredentials: true },
+      )
 
       if (response.data.success) {
         setDeviceStates((prev) => ({
           ...prev,
           [device.id]: newState === "on",
         }))
+
+        toast.success(
+          `Device "${device.Name}" turned ${newState === "on" ? "ON" : "OFF"}`
+        ) // ✅ ON/OFF toast
       } else {
-        setError("Failed to control device")
+        const msg = "Failed to control device"
+        setError(msg)
+        toast.error(msg) // ✅
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to control device")
+      const msg = err.response?.data?.message || "Failed to control device"
+      setError(msg)
+      toast.error(`Error controlling device: ${msg}`) // ✅
       console.error("[v0] Error toggling device:", err)
     } finally {
       setTogglingDevice(null)
@@ -249,6 +323,7 @@ export default function DevicesManagement() {
       PinNumber: device.PinNumber.toString(),
       labId: device.labId.toString(),
       allowedDevices: device.allowedDevices,
+      studentAllowed: device.studentAllowed,
     })
     setIsEditOpen(true)
     setError("")
@@ -274,7 +349,13 @@ export default function DevicesManagement() {
             <Button
               className="gap-2"
               onClick={() => {
-                setFormData({ Name: "", PinNumber: "", labId: "", allowedDevices: true })
+                setFormData({
+                  Name: "",
+                  PinNumber: "",
+                  labId: "",
+                  allowedDevices: true,
+                  studentAllowed: true,
+                })
                 setError("")
               }}
             >
@@ -326,6 +407,18 @@ export default function DevicesManagement() {
                 />
                 <label htmlFor="allowedDevices" className="text-sm">
                   Allow device control by faculty
+                </label>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="studentAllowed"
+                  checked={formData.studentAllowed}
+                  onChange={(e) => setFormData({ ...formData, studentAllowed: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="studentAllowed" className="text-sm">
+                  Allow device control by student
                 </label>
               </div>
               <div className="flex gap-3">
@@ -418,7 +511,12 @@ export default function DevicesManagement() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(device)} className="gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditDialog(device)}
+                            className="gap-2"
+                          >
                             <Edit2 className="h-4 w-4" />
                             Edit
                           </Button>
@@ -514,6 +612,18 @@ export default function DevicesManagement() {
               />
               <label htmlFor="allowedDevicesEdit" className="text-sm">
                 Allow device control by faculty
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="studentAllowedEdit"
+                checked={formData.studentAllowed}
+                onChange={(e) => setFormData({ ...formData, studentAllowed: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="studentAllowedEdit" className="text-sm">
+                Allow device control by student
               </label>
             </div>
             <div className="flex gap-3">

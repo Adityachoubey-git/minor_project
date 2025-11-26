@@ -9,9 +9,9 @@ export function Studentsidebar() {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-    { icon: BookOpen, label: "Experiments", href: "/dashboard/student/experiments" },
-    { icon: Zap, label: "Devices", href: "/dashboard/student/devices" },
-    { icon: Clock, label: "Submissions", href: "/dashboard/student/submissions" },
+    
+    { icon: Zap, label: "Activity History", href: "/dashboard/student/devices" },
+    { icon: Clock, label: "Logout", href: "/dashboard/student/submissions" },
   ]
 
   return (

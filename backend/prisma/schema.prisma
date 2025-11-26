@@ -19,6 +19,7 @@ model Devices {
   Name            String
   PinNumber       Int @unique
   allowedDevices  Boolean
+  studentAllowed  Boolean @default(true)
   labId           Int
   value Boolean  @default(false)
   Lab             Lab   @relation(fields: [labId], references: [id])

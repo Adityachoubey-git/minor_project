@@ -1,0 +1,17 @@
+# Node modules
+backend/node_modules/
+frontend/node_modules/
+
+# Env files
+backend/.env
+frontend/.env
+
+# Logs
+*.log
+backend/logs/
+
+# Next.js build output
+frontend/.next/
+
+# Editor settings (optional, if team doesn’t share VSCode settings)
+.vscode/

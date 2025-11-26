@@ -4,17 +4,17 @@ import ErrorHandler from "../middlewares/error";
 import { ParamsDictionary } from "express-serve-static-core";
 import { ParsedQs } from "qs";
 import { findLabById } from "../repository/lab.repo";
-import { countDevicesRepo, createDeviceRepo, deleteDeviceRepo, findDeviceById, findDeviceByPin, getDevicesRepo, updateDeviceRepo } from "../repository/devices.repo";
+import { countDevicesRepo, createDeviceRepo, deleteDeviceRepo, findDeviceById, findDeviceByPin, getDevicesByLabIdRepo, getDevicesRepo, updateDeviceRepo } from "../repository/devices.repo";
 
 
 export const createDeviceHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { Name, PinNumber, allowedDevices, labId } = req.body;
+      const { Name, PinNumber, allowedDevices, labId,studentAllowed } = req.body;
 
       // ✅ Input validation
       if (!Name || PinNumber === undefined || labId === undefined) {
-        return next(new ErrorHandler("Name, PinNumber, and labId are required", 400));
+        return next(new ErrorHandler("Name, PinNumber and labId are required", 400));
       }
 
       // ✅ Extract user info
@@ -43,6 +43,7 @@ console.log("User role:", role);
         PinNumber: Number(PinNumber),
         allowedDevices: allowedDevices ?? true,
         labId: Number(labId),
+        studentAllowed
       });
 
       res.status(201).json({
@@ -63,14 +64,14 @@ export const editDeviceHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;
-      const { Name, PinNumber, allowedDevices, labId } = req.body;
+      const { Name, PinNumber, allowedDevices, labId,studentAllowed } = req.body;
 
       // ✅ Validate input
       if (!id) return next(new ErrorHandler("Device ID is required", 400));
 
       // ✅ Extract user info
     const role = req.user?.role;
-console.log("User role:", role);
+     console.log("User role:", role);
 
       // ✅ Only ADMIN can edit devices
       if (role !== "ADMIN") {
@@ -107,6 +108,7 @@ console.log("User role:", role);
         PinNumber,
         allowedDevices,
         labId,
+        studentAllowed
       });
 
       res.status(200).json({
@@ -178,12 +180,14 @@ export const getDevicesHandler = catchAsyncError(
           : undefined;
 
       const skip = (page - 1) * limit;
+      const studentAllowed=req.query.studentAllowed!==undefined ? req.query.studentAllowed === "true":undefined
 
       // 🔹 Get filtered devices
       const devices = await getDevicesRepo({
         search,
         labId,
         pin,
+        studentAllowed,
         allowedDevices,
         skip,
         limit,
@@ -206,6 +210,42 @@ export const getDevicesHandler = catchAsyncError(
       });
     } catch (err) {
       console.error("Error fetching devices:", err);
+      next(new ErrorHandler("Something went wrong while fetching devices", 500));
+    }
+  }
+);
+export const getDevicesByLabHandler = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { labId } = req.params;
+
+      // ✅ Validate input
+      if (!labId) {
+        return next(new ErrorHandler("Lab ID is required", 400));
+      }
+
+      const labIdNumber = Number(labId);
+      if (isNaN(labIdNumber)) {
+        return next(new ErrorHandler("Lab ID must be a number", 400));
+      }
+
+      // ✅ Check if lab exists
+      const lab = await findLabById(labIdNumber);
+      if (!lab) {
+        return next(new ErrorHandler("Lab not found", 404));
+      }
+
+      // ✅ Fetch devices for this lab
+      const devices = await getDevicesByLabIdRepo(labIdNumber);
+
+      res.status(200).json({
+        success: true,
+        labId: labIdNumber,
+        labName: lab.name,
+        devices,
+      });
+    } catch (err) {
+      console.error("Error fetching devices by lab:", err);
       next(new ErrorHandler("Something went wrong while fetching devices", 500));
     }
   }

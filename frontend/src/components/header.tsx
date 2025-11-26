@@ -41,21 +41,23 @@ export function Header({ onSidebarToggle, mobileSidebar }: HeaderProps) {
     return last.charAt(0).toUpperCase() + last.slice(1)
   }
 
-  // 🚪 Proper logout (clears cookie via backend)
   const handleLogout = async () => {
-    try {
-      await axios.post(`${Base_Url}/auth/logout`, {}, { withCredentials: true })
-    } catch (err) {
-      console.error("Logout failed:", err)
-    } finally {
-      // clear frontend state
-      setUserData(null)
-      localStorage.removeItem("userRole")
-      localStorage.removeItem("userName")
-      localStorage.removeItem("isAuthenticated")
-      router.push("/")
-    }
+  try {
+    // (optional) if you later add a backend logout API:
+    // await axios.post(`${Base_Url}/auth/logout`, {}, { withCredentials: true })
+  } catch (err) {
+    console.error("Logout failed:", err)
+  } finally {
+    // clear frontend state
+    setUserData(null)
+    localStorage.removeItem("userRole")
+    localStorage.removeItem("userName")
+    localStorage.removeItem("isAuthenticated")
+
+    // 🔥 Hard redirect to your frontend base URL
+    window.location.href = "http://localhost:3000/"
   }
+}
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 dark:bg-slate-900 dark:border-slate-800">

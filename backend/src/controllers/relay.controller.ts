@@ -59,8 +59,8 @@ export const controlDevicesHandler = catchAsyncError(
 
     for (const dev of devices) {
       // 🔒 Role validation
-      if (user.role === "STUDENT") {
-        return next(new ErrorHandler("Students cannot control devices", 403));
+      if (user.role === "STUDENT" && !dev.studentAllowed ) {
+        return next(new ErrorHandler(`Students cannot control ${dev.Name} device`, 403));
       }
       if (user.role === "FACULTY" && !dev.allowedDevices) {
         return next(new ErrorHandler(`Device ${dev.Name} not allowed`, 403));
