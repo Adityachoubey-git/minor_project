@@ -42,18 +42,37 @@ export default function RegisterPage() {
           role: formData.role,
           Idnumber: formData.idNumber,
         },
-        { withCredentials: true } // ✅ send cookies
+        { withCredentials: true }
       )
 
       if (response.data.success) {
-        // ✅ Ensure user.id exists in backend response
-        setEmail(formData.email)
-        setUserId(response.data.user?.id || "")
+        const newUserId = response.data.user?.id || ""
+        const newEmail = formData.email
+
+        setEmail(newEmail)
+        setUserId(newUserId)
         setIsSuccess(true)
 
-        // ✅ Optional auto redirect after short delay
+        // ✅ Save pending verify context for VerifyPage
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(
+              "pendingVerify",
+              JSON.stringify({
+                user_id: Number(newUserId),
+                email: newEmail,
+              })
+            )
+          } catch {
+            // ignore storage errors
+          }
+        }
+
+        // ✅ Redirect to verify page with query params as fallback
         setTimeout(() => {
-          router.push(`/verify?email=${encodeURIComponent(formData.email)}&user_id=${response.data.user?.id}`)
+          router.push(
+            `/verify?email=${encodeURIComponent(newEmail)}&user_id=${encodeURIComponent(newUserId)}`
+          )
         }, 1500)
       } else {
         setError(response.data.message || "Registration failed. Please try again.")
@@ -86,11 +105,18 @@ export default function RegisterPage() {
             <div>
               <h2 className="text-2xl font-bold mb-2">Account Created!</h2>
               <p className="text-muted-foreground">
-                Check your email for verification details. You’ll be redirected to the OTP verification page shortly.
+                Check your email for verification details. You’ll be redirected to the OTP verification
+                page shortly.
               </p>
             </div>
             <Button asChild className="w-full rounded-lg">
-              <Link href={`/verify?email=${encodeURIComponent(email)}&user_id=${userId}`}>Verify Email</Link>
+              <Link
+                href={`/verify?email=${encodeURIComponent(email)}&user_id=${encodeURIComponent(
+                  userId
+                )}`}
+              >
+                Verify Email
+              </Link>
             </Button>
             <Link href="/" className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80">
               <ArrowLeft className="w-4 h-4" />

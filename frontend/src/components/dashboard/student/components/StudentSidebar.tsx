@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, BookOpen, Zap, Clock } from "lucide-react"
+import { LayoutDashboard, BookOpen, Zap, Clock, Users } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -10,8 +10,9 @@ export function Studentsidebar() {
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     
-    { icon: Zap, label: "Activity History", href: "/dashboard/student/devices" },
-    { icon: Clock, label: "Logout", href: "/dashboard/student/submissions" },
+       { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
+
+
   ]
 
   return (

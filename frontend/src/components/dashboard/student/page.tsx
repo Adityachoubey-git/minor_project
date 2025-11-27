@@ -147,7 +147,7 @@ export default function StudentDashboard() {
                   <span className="text-sm font-medium">
                     {device.studentAllowed ? "You can control this" : "Not allowed"}
                   </span>
-                   //switch works as turned on when actually hardware is connected 
+                   {/* //switch works as turned on when actually hardware is connected  */}
                   <Switch
                     checked={device.value}
                     disabled={!device.studentAllowed}

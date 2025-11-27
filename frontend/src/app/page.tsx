@@ -150,7 +150,12 @@ const handleLogin = async () => {
     setError("Unexpected login state. Please try again.")
   } catch (err: any) {
     // If server responds with OTP-needed shape in error, handle here too
-    const msg = err.response?.data?.message || "Login failed. Please try again."
+   const raw = err.response?.data
+  const msg =
+    raw?.message ||
+    raw?.error ||                     // 👈 take backend "error" field
+    "Login failed. Please try again."
+
     const needsVerify =
       msg.toLowerCase().includes("verification") ||
       err.response?.data?.emailverified === false

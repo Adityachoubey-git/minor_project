@@ -43,7 +43,7 @@ model Command {
 
   // multi-device when needed
   devices      Devices[]  @relation("MultiDeviceCommands")
-    user         user       @relation(fields: [userId], references: [id])   // ⭐ MUST EXIST
+    user         user       @relation(fields: [userId], references: [id])   // ⭐ MUST EXIST  
 }
 
 model Lab {

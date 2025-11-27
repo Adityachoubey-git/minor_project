@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import type React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import axios from "axios"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ type PendingVerify = { user_id: number; email: string }
 
 export default function VerifyPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [isLoading, setIsLoading] = useState(false)
   const [isVerified, setIsVerified] = useState(false)
@@ -23,19 +24,33 @@ export default function VerifyPage() {
   const [resendCount, setResendCount] = useState(0)
   const [pending, setPending] = useState<PendingVerify | null>(null)
 
-  // Load pending verification info (set in login step)
+  // Load pending verification info:
+  // 1) from sessionStorage (login/register flow storing it)
+  // 2) from URL query (?email=&user_id=) as fallback
   useEffect(() => {
+    // 1) Try from sessionStorage
     try {
-      const raw = sessionStorage.getItem("pendingVerify")
-      if (raw) {
-        setPending(JSON.parse(raw))
-      } else {
-        setError("Missing verification context. Please log in again.")
+      if (typeof window !== "undefined") {
+        const raw = window.sessionStorage.getItem("pendingVerify")
+        if (raw) {
+          setPending(JSON.parse(raw))
+          return
+        }
       }
     } catch {
-      setError("Unable to load verification context. Please log in again.")
+      // ignore and fall back to URL
     }
-  }, [])
+
+    // 2) Fallback to URL params
+    const uid = searchParams.get("user_id")
+    const email = searchParams.get("email")
+
+    if (uid && email) {
+      setPending({ user_id: Number(uid), email })
+    } else {
+      setError("Missing verification context. Please log in again.")
+    }
+  }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,8 +75,13 @@ export default function VerifyPage() {
 
       if (res.data.success) {
         setIsVerified(true)
-        // clean up temp data
-        sessionStorage.removeItem("pendingVerify")
+        try {
+          if (typeof window !== "undefined") {
+            window.sessionStorage.removeItem("pendingVerify")
+          }
+        } catch {
+          // ignore
+        }
         setTimeout(() => router.push("/dashboard"), 1000)
       } else {
         setError(res.data.message || "OTP verification failed.")
@@ -140,7 +160,9 @@ export default function VerifyPage() {
             <h1 className="text-2xl font-bold mb-2">Verify Your Email</h1>
             <p className="text-sm text-muted-foreground">
               We've sent a verification code to{" "}
-              <span className="font-medium text-foreground">{pending?.email || "your email"}</span>
+              <span className="font-medium text-foreground">
+                {pending?.email || "your email"}
+              </span>
             </p>
           </div>
 
