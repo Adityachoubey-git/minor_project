@@ -100,6 +100,7 @@ export async function getDevicesRepo({
   limit = 10,
   studentAllowed
 }: DeviceQuery) {
+  
   const whereClause: any = {};
 
   if (search) {
@@ -109,19 +110,20 @@ export async function getDevicesRepo({
     };
   }
 
-  if (pin !== undefined) {
-    whereClause.PinNumber = pin;
+  if (pin !== undefined && !isNaN(Number(pin))) {
+    whereClause.PinNumber = Number(pin);
   }
 
-  if (allowedDevices !== undefined) {
-    whereClause.allowedDevices = allowedDevices;
-  }
-    if (studentAllowed !== undefined) {
-    whereClause.studentAllowed = studentAllowed;
+  if (allowedDevices !== undefined && !isNaN(Number(allowedDevices))) {
+    whereClause.allowedDevices = Boolean(Number(allowedDevices));
   }
 
-   if (labId !== undefined) {
-    whereClause.labId = labId;
+  if (studentAllowed !== undefined && !isNaN(Number(studentAllowed))) {
+    whereClause.studentAllowed = Boolean(Number(studentAllowed));
+  }
+
+  if (labId !== undefined && !isNaN(Number(labId))) {
+    whereClause.labId = Number(labId);
   }
 
   return prisma.devices.findMany({
@@ -137,13 +139,13 @@ export async function getDevicesRepo({
   });
 }
 
-// ✅ Count total for pagination
 export async function countDevicesRepo({
   search,
   labId,
   pin,
   allowedDevices,
 }: Omit<DeviceQuery, "skip" | "limit">) {
+  
   const whereClause: any = {};
 
   if (search) {
@@ -153,17 +155,19 @@ export async function countDevicesRepo({
     };
   }
 
-  if (pin !== undefined) {
-    whereClause.PinNumber = pin;
+  // PIN filter (safe number check)
+  if (pin !== undefined && !isNaN(Number(pin))) {
+    whereClause.PinNumber = Number(pin);
   }
 
-  if (allowedDevices !== undefined) {
-    whereClause.allowedDevices = allowedDevices;
+  // allowedDevices filter (convert 0/1 → boolean)
+  if (allowedDevices !== undefined && !isNaN(Number(allowedDevices))) {
+    whereClause.allowedDevices = Boolean(Number(allowedDevices));
   }
 
- 
-   if (labId !== undefined) {
-    whereClause.labId = labId;
+  // labId filter (safe number check)
+  if (labId !== undefined && !isNaN(Number(labId))) {
+    whereClause.labId = Number(labId);
   }
 
   return prisma.devices.count({

@@ -11,7 +11,7 @@ router.post("/create", isAuthenticated,IsAdmin,createDeviceHandler);
 
 router.put("/deviceEdit/:id", isAuthenticated,IsAdmin, editDeviceHandler);
 router.delete("/deviceDelete/:id", isAuthenticated,IsAdmin, deleteDeviceHandler);
-router.get("/get", getDevicesHandler);//router.get("/get",isAuthenticated, getDevicesHandler);
+router.get("/get", isAuthenticated,getDevicesHandler);//router.get("/get",isAuthenticated, getDevicesHandler);
 router.get("/lab/:labId", getDevicesByLabHandler);
 
 
