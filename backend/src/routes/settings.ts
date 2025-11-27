@@ -19,3 +19,4 @@ router.get(
   IsAdmin,
   getDevicesForGoodFeatureHandler
 );
+export default router;

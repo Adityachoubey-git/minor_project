@@ -13,7 +13,7 @@ export function AdminSidebar() {
     { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
     { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
     { icon: Wrench, label: "Devices Management", href: "/dashboard/devices" },
-
+    { icon: Wrench, label: "settings", href: "/dashboard/settings" },
 
   ]
 

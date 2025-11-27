@@ -8,6 +8,7 @@ import relayRoutes from "./routes/relay";
 import { processAlarmsHandler } from "./controllers/alram.controllers";
 import cron from "node-cron"
 import alarmRoutes from "./routes/alarm";
+import settingsRoutes from "./routes/settings";
 const app = express();
 const PORT =3001;
 
@@ -43,7 +44,7 @@ app.use ('/lab',labRouter)
 app.use('/devices', deviceRouter);
 app.use("/relay", relayRoutes);
 app.use("/alarms", alarmRoutes);
-
+app.use("/settings", settingsRoutes);
 // 404 handler
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
 
