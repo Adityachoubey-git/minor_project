@@ -44,7 +44,7 @@ export function Header({ onSidebarToggle, mobileSidebar }: HeaderProps) {
   const handleLogout = async () => {
   try {
     // (optional) if you later add a backend logout API:
-    // await axios.post(`${Base_Url}/auth/logout`, {}, { withCredentials: true })
+    await axios.post(`${Base_Url}/auth/logout`, {}, { withCredentials: true })
   } catch (err) {
     console.error("Logout failed:", err)
   } finally {
@@ -53,9 +53,9 @@ export function Header({ onSidebarToggle, mobileSidebar }: HeaderProps) {
     localStorage.removeItem("userRole")
     localStorage.removeItem("userName")
     localStorage.removeItem("isAuthenticated")
-
-    // 🔥 Hard redirect to your frontend base URL
-    window.location.href = "http://localhost:3000/"
+    router.push("/")
+    // // 🔥 Hard redirect to your frontend base URL
+    // window.location.href = "http://localhost:3000/"
   }
 }
 

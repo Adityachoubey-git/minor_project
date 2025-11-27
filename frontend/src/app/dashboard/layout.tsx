@@ -9,10 +9,10 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <UserProvider>
+        <><NextTopLoader />
             <DashboardLayout>
-                   <NextTopLoader />
+                   
                    {children}</DashboardLayout>
-        </UserProvider>
+        </>
     );
 }

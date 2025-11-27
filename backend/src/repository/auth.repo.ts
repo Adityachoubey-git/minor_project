@@ -127,6 +127,21 @@ export const updateTokenandExpiry= async(email:string,data:{
     }
   })
 }
+export const updateverificationcode= async(email:string,
+  emailverificationCode:string,
+  verificationCodeExpires:string
+)=>{
+
+  return await prisma.user.update({
+    where:{
+      email
+    },
+    data:{
+    emailverificationCode: emailverificationCode,
+        verificationCodeExpire: verificationCodeExpires,
+    }
+  })
+}
 
 
 export const updateNewPassword = async(email:string,newpassword:string)=>{

@@ -5,7 +5,7 @@ import { NextFunction,Request,Response } from "express";
 import ErrorHandler from "../middlewares/error";
 import { catchAsyncError } from "../middlewares/catchAsyncError";
 import prisma from "../db/db";
-import { createAdmin, createUser, findAdmin, findUserByEmail, getAdminDashboardStats, isUserEmailVerified, saveEmailVerificationCode, updateNewPassword, updateTokenandExpiry, userEmailExists } from "../repository/auth.repo";
+import { createAdmin, createUser, findAdmin, findUserByEmail, getAdminDashboardStats, isUserEmailVerified, saveEmailVerificationCode, updateNewPassword, updateTokenandExpiry, updateverificationcode, userEmailExists } from "../repository/auth.repo";
 import { sendToken } from "../utils/SendToken";
 import { generateEmailTemplate } from "../utils/EmailTemplate";
 import { sendEmail } from "../utils/SendEmail";
@@ -210,8 +210,21 @@ export const login = catchAsyncError(
     if (!isPasswordMatched) {
       return next(new ErrorHandler("invalid email or password", 400));
     }
-
+   const emailverificationCode = generateVerificationCode().toString();
+      const verificationCodeExpire = Date.now() + 24 * 60 * 60 * 1000;
     if (isUserExist.emailverified != true) {
+      
+      const user = await updateverificationcode(
+                  
+                      email,
+                  
+                      emailverificationCode,
+                      verificationCodeExpire.toString()
+
+      );
+              await sendEmailVerificationCode(email, emailverificationCode);
+      console.log("email verification code",emailverificationCode);
+
       res.status(401).json({
         success: false,
         message: "OTP verification required. Please verify your account.",
@@ -219,7 +232,11 @@ export const login = catchAsyncError(
         email: isUserExist.email,
        
         emailVerified: false,
+
       });
+
+    
+
       return;
     }
 
