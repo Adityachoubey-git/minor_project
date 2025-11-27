@@ -43,6 +43,7 @@ model Command {
 
   // multi-device when needed
   devices      Devices[]  @relation("MultiDeviceCommands")
+    user         user       @relation(fields: [userId], references: [id])   // ⭐ MUST EXIST
 }
 
 model Lab {
@@ -71,6 +72,8 @@ model user {
   last_login             DateTime? @default(now()) @db.Timestamp(6)
 
   alarms Alarm[]
+
+  commands Command[]
 }
 
 enum Role {
