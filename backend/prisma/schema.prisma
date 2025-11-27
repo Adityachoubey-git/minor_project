@@ -20,6 +20,9 @@ model Devices {
   PinNumber       Int @unique
   allowedDevices  Boolean
   studentAllowed  Boolean @default(true)
+    gmEnabled    Boolean  @default(true)   // for Good Morning
+  gnEnabled    Boolean  @default(true)   // for Good Night
+
   labId           Int
   value Boolean  @default(false)
   Lab             Lab   @relation(fields: [labId], references: [id])
