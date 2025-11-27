@@ -115,10 +115,15 @@ export const getDeviceCommandHistoryHandler = catchAsyncError(
     const deviceId = Number(req.params.id);
     if (isNaN(deviceId)) return next(new ErrorHandler("Invalid device ID", 400));
 
-    const history = await getDeviceHistoryRepo(deviceId);
-    res.status(200).json({ success: true, count: history.length, history });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 15;
+
+    const result = await getDeviceHistoryRepo(deviceId, page, limit);
+
+    res.status(200).json({ success: true, ...result });
   }
 );
+
 
 // ===============================================================
 // 🔹 4️⃣ Command history by user
@@ -128,23 +133,51 @@ export const getUserCommandHistoryHandler = catchAsyncError(
     const userId = Number(req.params.id);
     if (isNaN(userId)) return next(new ErrorHandler("Invalid user ID", 400));
 
-    const history = await getUserHistoryRepo(userId);
-    res.status(200).json({ success: true, count: history.length, history });
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 15;
+
+    const result = await getUserHistoryRepo(userId, page, limit);
+
+    res.status(200).json({ success: true, ...result });
   }
 );
-
 // ===============================================================
 // 🔹 5️⃣ All commands (Admin dashboard)
 // ===============================================================
 export const getAllCommandsHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
-const role = req.user?.role;
-console.log("User role:", role);
-    if (role !== "ADMIN")
-      return next(new ErrorHandler("Only admins can view all command logs", 403));
+    const role = req.user?.role;
 
-    const logs = await getAllCommandsRepo();
-    res.status(200).json({ success: true, count: logs.length, logs });
+    if (role === "STUDENT")
+      return next(new ErrorHandler("students cannot view all command logs", 403));
+
+    const {
+      page,
+      limit,
+      search,
+      status,
+      commandType,
+      userId,
+      deviceId,
+      labId,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const result = await getAllCommandsRepo({
+      page: Number(page) || 1,
+      limit: Number(limit) || 20,
+      search: search as string,
+      status,
+      commandType,
+      userId,
+      deviceId,
+      labId,
+      startDate,
+      endDate,
+    });
+
+    res.status(200).json({ success: true, ...result });
   }
 );
 

@@ -7,7 +7,7 @@ import { ThemeProvider } from "@/context/theme-context"
 import { Toaster } from "react-hot-toast"
 
 import { UserProvider } from "@/context/UserContext"
-
+import NextTopLoader from 'nextjs-toploader';
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
@@ -45,6 +45,7 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <ThemeProvider>
           <UserProvider>
+               <NextTopLoader />
           {children}
             <Toaster position="top-right" /> {/* 👈 required */}
           </UserProvider>

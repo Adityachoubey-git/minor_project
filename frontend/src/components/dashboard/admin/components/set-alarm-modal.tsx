@@ -125,7 +125,7 @@ export default function SetAlarmModal({
     setLoading(true)
     try {
       const response = await axios.post(
-        `${Base_Url}/alarm/create`,
+        `${Base_Url}/alarms/create`,
         {
           deviceIds: selectedDevices,
           state,

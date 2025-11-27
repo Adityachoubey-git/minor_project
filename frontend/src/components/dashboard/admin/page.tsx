@@ -125,7 +125,7 @@ export default function AdminDashboard() {
     try {
       const newState = deviceStates[device.id] ? "off" : "on"
       const response = await axios.post(
-        `${Base_Url}/devices/control`,
+        `${Base_Url}/relay/control`,
         {
           deviceIds: [device.id],
           state: newState,

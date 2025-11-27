@@ -11,7 +11,9 @@ export function AdminSidebar() {
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     {icon: Building2, label: " Manage Lab", href: "/dashboard/labs" },
     { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
+    { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
     { icon: Wrench, label: "Devices Management", href: "/dashboard/devices" },
+
 
   ]
 

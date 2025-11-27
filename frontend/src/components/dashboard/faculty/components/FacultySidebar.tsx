@@ -9,9 +9,8 @@ export function FacultySidebar() {
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-    { icon: BookOpen, label: "Classes", href: "/dashboard/faculty/classes" },
-    { icon: Users, label: "Students", href: "/dashboard/faculty/students" },
-    { icon: BarChart3, label: "Reports", href: "/dashboard/faculty/reports" },
+   { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
+    { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
   ]
 
   return (
