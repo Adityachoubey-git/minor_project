@@ -7,7 +7,7 @@ import { ParsedQs } from "qs";
 import prisma from "../db/db";
 import { getAllCommandsRepo, getDeviceHistoryRepo, getUserHistoryRepo, updateDeviceStateRepo } from "../repository/relay.repo";
 
-
+ 
 const ESP32_IP = process.env.ESP32_IP // ⬅️ change per lab if needed
 
 // ===============================================================

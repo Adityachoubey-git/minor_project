@@ -3,7 +3,7 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 WebServer server(80);
-
+ 
 // ======================== Wi-Fi CONFIG ========================
 const char* ssid = "Aditya";
 const char* password = "11111111";
@@ -91,57 +91,57 @@ void setup() {
 // ======================== LOOP ========================
 void loop() {
     server.handleClient();
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.setTimeout(1500);
-    http.begin(stateUrl);
-    int httpCode = http.GET();
+  // if (WiFi.status() == WL_CONNECTED) {
+  //   HTTPClient http;
+  //   http.setTimeout(1500);
+  //   http.begin(stateUrl);
+  //   int httpCode = http.GET();
 
-    if (httpCode == 200) {
-      String payload = http.getString();
-      Serial.println("Received payload:");
-      Serial.println(payload);
+  //   if (httpCode == 200) {
+  //     String payload = http.getString();
+  //     Serial.println("Received payload:");
+  //     Serial.println(payload);
 
-      StaticJsonDocument<1024> doc;
-      DeserializationError err = deserializeJson(doc, payload);
-      if (err) {
-        Serial.print("JSON parse failed: ");
-        Serial.println(err.c_str());
-      } else {
-        // Single relay
-        if (doc.containsKey("relay")) {
-          int pin = doc["relay"]["pin"];
-          bool state = doc["relay"]["state"];
-          if (!(pin >= 6 && pin <= 11)) { // skip invalid pins
-            relayStates[pin] = state;
-            relayWrite(pin, state);
-            Serial.printf("Pin %d → %s\n", pin, state ? "ON" : "OFF");
-          }
-        }
-        // Multiple relays
-        else if (doc.containsKey("relays")) {
-          JsonArray arr = doc["relays"].as<JsonArray>();
-          for (JsonObject r : arr) {
-            int pin = r["pin"];
-            bool state = r["state"];
-            if (!(pin >= 6 && pin <= 11)) {
-              relayStates[pin] = state;
-              relayWrite(pin, state);
-              Serial.printf("Pin %d → %s\n", pin, state ? "ON" : "OFF");
-            }
-          }
-        } else {
-          Serial.println("Unexpected JSON format!");
-        }
-      }
-    } else {
-    Serial.printf("HTTP Error: %d (%s)\n", httpCode, http.errorToString(httpCode).c_str());
-    }
-    http.end();
-  } else {
-    Serial.println("WiFi disconnected. Reconnecting...");
-    WiFi.reconnect();
-  }
+  //     StaticJsonDocument<1024> doc;
+  //     DeserializationError err = deserializeJson(doc, payload);
+  //     if (err) {
+  //       Serial.print("JSON parse failed: ");
+  //       Serial.println(err.c_str());
+  //     } else {
+  //       // Single relay
+  //       if (doc.containsKey("relay")) {
+  //         int pin = doc["relay"]["pin"];
+  //         bool state = doc["relay"]["state"];
+  //         if (!(pin >= 6 && pin <= 11)) { // skip invalid pins
+  //           relayStates[pin] = state;
+  //           relayWrite(pin, state);
+  //           Serial.printf("Pin %d → %s\n", pin, state ? "ON" : "OFF");
+  //         }
+  //       }
+  //       // Multiple relays
+  //       else if (doc.containsKey("relays")) {
+  //         JsonArray arr = doc["relays"].as<JsonArray>();
+  //         for (JsonObject r : arr) {
+  //           int pin = r["pin"];
+  //           bool state = r["state"];
+  //           if (!(pin >= 6 && pin <= 11)) {
+  //             relayStates[pin] = state;
+  //             relayWrite(pin, state);
+  //             Serial.printf("Pin %d → %s\n", pin, state ? "ON" : "OFF");
+  //           }
+  //         }
+  //       } else {
+  //         Serial.println("Unexpected JSON format!");
+  //       }
+  //     }
+  //   } else {
+  //   Serial.printf("HTTP Error: %d (%s)\n", httpCode, http.errorToString(httpCode).c_str());
+  //   }
+  //   http.end();
+  // } else {
+  //   Serial.println("WiFi disconnected. Reconnecting...");
+  //   WiFi.reconnect();
+  // }
 
   delay(2000); // poll every 2s
 }
