@@ -64,7 +64,8 @@ export default function DevicesManagement() {
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
-  const [deviceStates, setDeviceStates] = useState<{ [key: number]: boolean }>({})
+  const [deviceStates, setDeviceStates] = useState<{ [key: number]: "on" | "off" | "unreachable" }>({})
+
   const [togglingDevice, setTogglingDevice] = useState<number | null>(null)
   const [error, setError] = useState("")
 
@@ -123,32 +124,42 @@ export default function DevicesManagement() {
       setLoading(false)
     }
   }, [page, search])
-
   const fetchDeviceStates = async (devicesToCheck: Device[]) => {
     try {
       const pins = devicesToCheck.map((d) => d.PinNumber)
       const response = await axios.post(
         `${Base_Url}/relay/live-state`,
-        {
-          pins,
-        },
+        { pins },
         { withCredentials: true },
       )
 
       if (response.data.success) {
-        const statesMap: { [key: number]: boolean } = {}
-        response.data.states.forEach((state: { pin: number; state?: string; error?: string }) => {
-          const device = devicesToCheck.find((d) => d.PinNumber === state.pin)
-          if (device) {
-            statesMap[device.id] = state.state === "on"
-          }
-        })
+        const statesMap: { [key: number]: "on" | "off" | "unreachable" } = {}
+
+        response.data.states.forEach(
+          (state: { pin: number; state?: number; error?: string }) => {
+            const device = devicesToCheck.find((d) => d.PinNumber === state.pin)
+            if (!device) return
+
+            if (state.error === "unreachable") {
+              statesMap[device.id] = "unreachable"
+            } else if (state.state === 0) {
+              // 0 => ON
+              statesMap[device.id] = "on"
+            } else if (state.state === 1) {
+              // 1 => OFF
+              statesMap[device.id] = "off"
+            }
+          },
+        )
+
         setDeviceStates(statesMap)
       }
     } catch (err) {
       console.error("[v0] Error fetching device states:", err)
     }
   }
+
 
   useEffect(() => {
     fetchDevices()
@@ -279,42 +290,45 @@ export default function DevicesManagement() {
     }
   }
 
-  const handleToggleDevice = async (device: Device) => {
-    setTogglingDevice(device.id)
-    try {
-      const newState = deviceStates[device.id] ? "off" : "on"
-      const response = await axios.post(
-        `${Base_Url}/relay/control`,
-        {
-          deviceIds: [device.id],
-          state: newState,
-        },
-        { withCredentials: true },
+ const handleToggleDevice = async (device: Device) => {
+  const currentState = deviceStates[device.id]
+  const isOn = currentState === "on"
+
+  setTogglingDevice(device.id)
+  try {
+    const newState = isOn ? "off" : "on"
+
+    const response = await axios.post(
+      `${Base_Url}/relay/control`,
+      {
+        deviceIds: [device.id],
+        state: newState,
+      },
+      { withCredentials: true },
+    )
+
+    if (response.data.success) {
+      toast.success(
+        `Device "${device.Name}" turned ${newState === "on" ? "ON" : "OFF"}`,
       )
 
-      if (response.data.success) {
-        setDeviceStates((prev) => ({
-          ...prev,
-          [device.id]: newState === "on",
-        }))
-
-        toast.success(
-          `Device "${device.Name}" turned ${newState === "on" ? "ON" : "OFF"}`
-        ) // ✅ ON/OFF toast
-      } else {
-        const msg = "Failed to control device"
-        setError(msg)
-        toast.error(msg) // ✅
-      }
-    } catch (err: any) {
-      const msg = err.response?.data?.message || "Failed to control device"
+      // 🔁 Immediately fetch live state for this device again
+      await fetchDeviceStates([device])
+    } else {
+      const msg = "Failed to control device"
       setError(msg)
-      toast.error(`Error controlling device: ${msg}`) // ✅
-      console.error("[v0] Error toggling device:", err)
-    } finally {
-      setTogglingDevice(null)
+      toast.error(msg)
     }
+  } catch (err: any) {
+    const msg = err.response?.data?.message || "Failed to control device"
+    setError(msg)
+    toast.error(`Error controlling device: ${msg}`)
+    console.error("[v0] Error toggling device:", err)
+  } finally {
+    setTogglingDevice(null)
   }
+}
+
 
   const openEditDialog = (device: Device) => {
     setSelectedDevice(device)
@@ -485,30 +499,44 @@ export default function DevicesManagement() {
                       <TableCell>{device.PinNumber}</TableCell>
                       <TableCell>{device.Lab?.name || "Unassigned"}</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleDevice(device)}
-                          disabled={togglingDevice === device.id}
-                          className={`gap-2 ${
-                            deviceStates[device.id]
-                              ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400"
-                              : "bg-red-500/10 border-red-500 text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {togglingDevice === device.id ? (
-                            <>
-                              <Zap className="h-4 w-4 animate-spin" />
-                              {deviceStates[device.id] ? "Turning OFF" : "Turning ON"}
-                            </>
-                          ) : (
-                            <>
-                              <Power className="h-4 w-4" />
-                              {deviceStates[device.id] ? "ON" : "OFF"}
-                            </>
-                          )}
-                        </Button>
+                        {(() => {
+                          const state = deviceStates[device.id] // "on" | "off" | "unreachable" | undefined
+                          const isOn = state === "on"
+                          const isUnreachable = state === "unreachable"
+
+                          return (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleDevice(device)}
+                              disabled={togglingDevice === device.id || isUnreachable}
+                              className={`gap-2 ${isUnreachable
+                                  ? "bg-gray-500/10 border-gray-500 text-gray-600 dark:text-gray-400"
+                                  : isOn
+                                    ? "bg-green-500/10 border-green-500 text-green-600 dark:text-green-400"
+                                    : "bg-red-500/10 border-red-500 text-red-600 dark:text-red-400"
+                                }`}
+                            >
+                              {togglingDevice === device.id ? (
+                                <>
+                                  <Zap className="h-4 w-4 animate-spin" />
+                                  {isOn ? "Turning OFF" : "Turning ON"}
+                                </>
+                              ) : (
+                                <>
+                                  <Power className="h-4 w-4" />
+                                  {isUnreachable
+                                    ? "Unreachable"
+                                    : isOn
+                                      ? "ON"
+                                      : "OFF"}
+                                </>
+                              )}
+                            </Button>
+                          )
+                        })()}
                       </TableCell>
+
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
