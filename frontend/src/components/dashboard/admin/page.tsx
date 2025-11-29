@@ -281,7 +281,19 @@ export default function AdminDashboard() {
   if (loading && !stats) return <Loader fullScreen />;
 
   return (
+    
     <div className="m-10 space-y-8">
+          {/* ⭐ Set Alarm Button (reference-style, no other logic changed) */}
+      <div className="flex justify-end">
+        <Button
+          className="gap-2"
+          onClick={() => setIsAlarmModalOpen(true)}
+        >
+          <Clock className="h-4 w-4" />
+          Set Alarm
+        </Button>
+      </div>
+
       {/* ---------------- STATS SECTION ---------------- */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -342,17 +354,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* ⭐ Set Alarm Button (reference-style, no other logic changed) */}
-      <div className="flex justify-end">
-        <Button
-          className="gap-2"
-          onClick={() => setIsAlarmModalOpen(true)}
-        >
-          <Clock className="h-4 w-4" />
-          Set Alarm
-        </Button>
-      </div>
-
+  
       {/* ---------------- GLOBAL GM/GN BUTTONS ---------------- */}
       <div className="flex gap-4">
         <Button
