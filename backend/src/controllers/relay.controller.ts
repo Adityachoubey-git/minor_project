@@ -13,32 +13,31 @@ const ESP32_IP = process.env.ESP32_IP // ⬅️ change per lab if needed
 // ===============================================================
 // 🔹 1️⃣ Get current live state from ESP32
 // ===============================================================
-export const getLiveDeviceStateHandler = catchAsyncError(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const { pins } = req.body;
-    if (!Array.isArray(pins) || pins.length === 0) {
-      return next(new ErrorHandler("Provide pin numbers as [16,17,...]", 400));
-    }
-
-    const results: any[] = [];
-
-    for (const pin of pins) {
-      try {
-        const resp = await axios.get(`${ESP32_IP}/getState?pin=${pin}`, { timeout: 5000 });
-        results.push(resp.data);
-      } catch (err: any) {
-        console.error(`Error fetching state for pin ${pin}:`, err.message);
-        results.push({ pin, error: "unreachable" });
+  export const getLiveDeviceStateHandler = catchAsyncError(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { pins } = req.body;
+      if (!Array.isArray(pins) || pins.length === 0) {
+        return next(new ErrorHandler("Provide pin numbers as [16,17,...]", 400));
       }
-    }
 
-    res.status(200).json({
-      success: true,
-      count: results.length,
-      states: results,
-    });
-  }
-);
+      const results: any[] = [];
+
+      for (const pin of pins) {
+        try {
+          const resp = await axios.get(`${ESP32_IP}/getState?pin=${pin}`, { timeout: 5000 });
+          results.push(resp.data);
+        } catch (err: any) {
+          results.push({ pin, error: "unreachable" });
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        count: results.length,
+        states: results,
+      });
+    }
+  );
 
 // ===============================================================
 // 🔹 2️⃣ Turn ON/OFF single or multiple devices

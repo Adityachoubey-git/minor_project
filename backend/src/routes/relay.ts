@@ -23,6 +23,6 @@ router.get("/history/all", isAuthenticated, getAllCommandsHandler);
 
 // router.get("/state", (req, res) => {
 //   res.json({ relay: { pin: 16, state: true } }); // example payload
-// }); 
+// });
 
 export default router;
