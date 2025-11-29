@@ -173,33 +173,34 @@ export default function AdminDashboard() {
 
   /* -------------------- Toggle Single Device -------------------- */
   const handleToggleDevice = async (device: Device) => {
-    setTogglingDevice(device.id);
+  setTogglingDevice(device.id);
 
-    try {
-      const current = deviceStates[device.id];
-      const newState = current === "on" ? "off" : "on";
+  try {
+    const current = deviceStates[device.id];
+    const newState = current === "on" ? "off" : "on";
 
-      const res = await axios.post(
-        `${Base_Url}/relay/control`,
-        { deviceIds: [device.id], state: newState },
-        { withCredentials: true }
+    const res = await axios.post(
+      `${Base_Url}/relay/control`,
+      { deviceIds: [device.id], state: newState },
+      { withCredentials: true }
+    );
+
+    if (res.data.success) {
+      toast.success(
+        `Device "${device.Name}" turned ${newState.toUpperCase()}`
       );
-
-      if (res.data.success) {
-        toast.success(
-          `Device "${device.Name}" turned ${newState.toUpperCase()}`
-        );
-        await fetchDeviceStates([device]);
-      } else {
-        toast.error("Failed to toggle device");
-      }
-    } catch (err) {
-      console.error("[AdminDashboard] Failed to toggle device:", err);
+      // ⬇️ fetch states for ALL currently loaded devices
+      await fetchDeviceStates(devices);
+    } else {
       toast.error("Failed to toggle device");
-    } finally {
-      setTogglingDevice(null);
     }
-  };
+  } catch (err) {
+    console.error("[AdminDashboard] Failed to toggle device:", err);
+    toast.error("Failed to toggle device");
+  } finally {
+    setTogglingDevice(null);
+  }
+};
 
   /* -------------------- GLOBAL GM/GN -------------------- */
   const handleGlobalGoodMorning = async () => {
