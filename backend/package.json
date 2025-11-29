@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "prisma:generate": "npx prisma generate --schema=./prisma/schema.prisma"
-  }, 
+  },
   "type": "commonjs",
   "author": "Aditya,rishika,piyush,tarun",
   "license": "ISC",
