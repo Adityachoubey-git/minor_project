@@ -8,7 +8,7 @@ import prisma from "../db/db";
 import { getAllCommandsRepo, getDeviceHistoryRepo, getUserHistoryRepo, updateDeviceStateRepo } from "../repository/relay.repo";
 
 
-const ESP32_IP = "http://192.168.230.39"; // ⬅️ change per lab if needed
+const ESP32_IP = process.env.ESP32_IP // ⬅️ change per lab if needed
 
 // ===============================================================
 // 🔹 1️⃣ Get current live state from ESP32
@@ -24,9 +24,10 @@ export const getLiveDeviceStateHandler = catchAsyncError(
 
     for (const pin of pins) {
       try {
-        const resp = await axios.get(`${ESP32_IP}/getState?pin=${pin}`, { timeout: 2000 });
+        const resp = await axios.get(`${ESP32_IP}/getState?pin=${pin}`, { timeout: 5000 });
         results.push(resp.data);
       } catch (err: any) {
+        console.error(`Error fetching state for pin ${pin}:`, err.message);
         results.push({ pin, error: "unreachable" });
       }
     }
@@ -69,7 +70,7 @@ export const controlDevicesHandler = catchAsyncError(
       try {
         const espResp = await axios.get(
           `${ESP32_IP}/setState?pin=${dev.PinNumber}&state=${state}`,
-          { timeout: 2000 }
+          { timeout: 5000 }
         );
 
         // 🔹 Update DB state
