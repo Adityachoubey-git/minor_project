@@ -10,10 +10,12 @@ export function AdminSidebar() {
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     {icon: Building2, label: " Manage Lab", href: "/dashboard/labs" },
+    { icon: Users, label: "Users Management", href: "/dashboard/UserManagement" },
     { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
     { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
     { icon: Wrench, label: "Devices Management", href: "/dashboard/devices" },
     { icon: Wrench, label: "settings", href: "/dashboard/settings" },
+
 
   ]
 

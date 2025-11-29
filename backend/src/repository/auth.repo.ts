@@ -57,6 +57,8 @@ export async function userEmailExists(email: string) {
   };
 }
 
+
+
 //userId exists or not 
 export async function userIdExists(user_id: number) {
   const user = await prisma.user.findFirst({ where: { id: user_id }, select: {
@@ -67,6 +69,7 @@ export async function userIdExists(user_id: number) {
     verificationCodeExpire:true,
     emailverificationCode:true,
     emailverified:true,
+    isActive:true
     
       }
     })

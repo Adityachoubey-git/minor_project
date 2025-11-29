@@ -11,12 +11,13 @@ export async function isAuthenticated(
   res: Response,
   next: NextFunction
 ) {
-  console.log("hey i am cookies",req.cookies);
+  console.log("hey i am cookies", req.cookies);
   const { token } = req.cookies;
 
   if (!token) {
     return next(new ErrorHandler("User is not authenticated.", 400));
   }
+
   const SECRET = process.env.JWT_SECRET_KEY || "";
   let decoded;
   try {
@@ -28,27 +29,37 @@ export async function isAuthenticated(
   let user;
   if (typeof decoded !== "string" && decoded.user_id) {
     user = await userIdExists(parseInt(decoded.user_id));
-    // console.log(user);
-    if (!user) {                                                               
+
+    if (!user) {
       return next(new ErrorHandler("User not found.", 401));
     }
 
-  
+    // 🔴 NEW: block inactive users on all protected routes
+    if (!user.isActive) {
+      // optional: clear auth cookie so frontend is forced to re-login
+      res.clearCookie("token");
+      return next(
+        new ErrorHandler(
+          "This user is not active. Kindly contact admin.",
+          403
+        )
+      );
+    }
 
   } else {
     return next(new ErrorHandler("Invalid token.", 400));
   }
+
   if (!user) {
     return next(new ErrorHandler("User not found.", 401));
   }
 
   const authUser: AuthUser = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-   
-    };
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  };
 
-  req.user = authUser; 
+  req.user = authUser;
   next();
 }

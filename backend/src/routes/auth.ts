@@ -2,7 +2,7 @@ import "express";
 
 import express from "express";
 import "dotenv/config";
-import { emailVerifyOTP, getAdminStats, handleForgotPassword, handleGetUserProfile, handleRegister, hanldeResetPassword, login, logout, resendEmailOTP, SeedAdmin } from "../controllers/auth.controllers";
+import { emailVerifyOTP, getAdminStats, getAllUsersAdmin, getSingleUserAdmin, handleForgotPassword, handleGetUserProfile, handleRegister, hanldeResetPassword, login, logout, resendEmailOTP, SeedAdmin, updateUserStatusAdmin } from "../controllers/auth.controllers";
 import { isAuthenticated } from "../middlewares/authMiddleware";
 import { IsAdmin } from "../middlewares/IsAdmin";
 const router =express.Router();
@@ -30,5 +30,17 @@ router.post("/feedadmin", SeedAdmin);
 //dashboard count
 // ✅ Admin-only route
 router.get("/admin/stats", isAuthenticated,IsAdmin, getAdminStats)
+
+// 🧑‍💻 Admin user management
+router.get("/admin/users", isAuthenticated, IsAdmin, getAllUsersAdmin)
+
+router.get("/admin/users/:id", isAuthenticated, IsAdmin, getSingleUserAdmin)
+
+router.patch(
+  "/admin/users/:id/status",
+  isAuthenticated,
+  IsAdmin,
+  updateUserStatusAdmin
+)
 
 export default  router;

@@ -197,6 +197,7 @@ export const login = catchAsyncError(
     if (!email || !password) {
       return next(new ErrorHandler("email and password are required.", 400));
     }
+ 
     const isUserExist = await userEmailExists(email);
 
     if (!isUserExist) {
@@ -209,6 +210,14 @@ export const login = catchAsyncError(
     );
     if (!isPasswordMatched) {
       return next(new ErrorHandler("invalid email or password", 400));
+    }
+     if (!isUserExist.isActive) {
+      return next(
+        new ErrorHandler(
+          "This user is not Active. Kindly contact Admin.",
+          403
+        ),
+      )
     }
    const emailverificationCode = generateVerificationCode().toString();
       const verificationCodeExpire = Date.now() + 24 * 60 * 60 * 1000;
@@ -479,3 +488,142 @@ export const getAdminStats = catchAsyncError(
     })
   }
 )
+// ADMIN: Get paginated list of users
+export const getAllUsersAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 20
+    const search = (req.query.search as string) || ""
+    const role = req.query.role as string | undefined  // 👈 NEW
+
+    const where: any = {}
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { IDnumber: { contains: search, mode: "insensitive" } },
+      ]
+    }
+
+    // 🔹 Optional role filter (FACULTY / STUDENT / ADMIN)
+    if (role && ["FACULTY", "STUDENT", "ADMIN"].includes(role)) {
+      where.role = role
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.count({ where }),
+    ])
+
+    const safeUsers = users.map(
+      ({
+        password,
+        resetToken,
+        resetTokenExpiry,
+        emailverificationCode,
+        verificationCodeExpire,
+        ...rest
+      }) => rest,
+    )
+
+    res.status(200).json({
+      success: true,
+      users: safeUsers,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+
+// ADMIN: Get single user profile
+export const getSingleUserAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = Number(req.params.id)
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+    })
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" })
+    }
+
+    const {
+      password,
+      resetToken,
+      resetTokenExpiry,
+      emailverificationCode,
+      verificationCodeExpire,
+      ...safeUser
+    } = user
+
+    res.status(200).json({
+      success: true,
+      user: safeUser,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ADMIN: Update user active/inactive status
+export const updateUserStatusAdmin = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const id = Number(req.params.id)
+    const { isActive } = req.body
+
+    if (typeof isActive !== "boolean") {
+      return res
+        .status(400)
+        .json({ success: false, message: "isActive must be boolean" })
+    }
+
+    // (Optional) prevent admin from deactivating themselves:
+    // if (req.user && req.user.id === id && isActive === false) { ... }
+
+    const user = await prisma.user.update({
+      where: { id },
+      data: { isActive },
+    })
+
+    const {
+      password,
+      resetToken,
+      resetTokenExpiry,
+      emailverificationCode,
+      verificationCodeExpire,
+      ...safeUser
+    } = user
+
+    res.status(200).json({
+      success: true,
+      user: safeUser,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
