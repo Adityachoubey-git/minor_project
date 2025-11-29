@@ -58,12 +58,8 @@ export async function updateDeviceRepo(
   if (data.Name !== undefined) updateData.Name = data.Name;
   if (data.PinNumber !== undefined) updateData.PinNumber = data.PinNumber;
   if (data.allowedDevices !== undefined) updateData.allowedDevices = data.allowedDevices;
-   if (data.studentAllowed !== undefined) updateData.studentAllowed = data.studentAllowed;
-  if (data.labId !== undefined) {
-    updateData.Lab = {
-      set: [{ id: data.labId }], // replaces existing lab association
-    };
-  }
+  if (data.studentAllowed !== undefined)  updateData.studentAllowed = data.studentAllowed; 
+  if (data.labId !== undefined) updateData.labId=data.labId; 
 
   return prisma.devices.update({
     where: { id },
