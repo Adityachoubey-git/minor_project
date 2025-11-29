@@ -3,12 +3,12 @@
 #include <ArduinoJson.h>
 #include <WebServer.h>
 WebServer server(80);
- 
+
 // ======================== Wi-Fi CONFIG ========================
 const char* ssid = "Aditya";
 const char* password = "11111111";
 const int   CH   = 11;  
-const char* stateUrl = "http://192.168.230.115:3000/relay/state";
+const char* stateUrl = "http://10.130.75.115:3001/relay/state";
 
 // ======================== RELAY CONFIG ========================
 bool ACTIVE_LOW = true;
