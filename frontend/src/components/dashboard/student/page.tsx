@@ -7,7 +7,6 @@ import Base_Url from "@/hooks/Baseurl";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectItem, SelectValue, SelectContent } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 import { Zap, Sunrise, Moon, Power } from "lucide-react";
 import { motion } from "framer-motion";
@@ -23,7 +22,7 @@ interface Device {
   id: number;
   Name: string;
   PinNumber: number;
-  value: boolean; // ON/OFF
+  value: boolean; // DB value (not used for live state after change)
   studentAllowed: boolean;
   allowedDevices: boolean;
   gmEnabled: boolean;
@@ -31,11 +30,12 @@ interface Device {
   labId: number;
 }
 
-/* ---------------------------- Component ---------------------------- */
+type DeviceLiveState = "on" | "off" | "unreachable";
+
 export default function StudentDashboard() {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [deviceStates, setDeviceStates] = useState<{ [key: number]: boolean }>({});
+  const [deviceStates, setDeviceStates] = useState<{ [key: number]: DeviceLiveState }>({});
   const [selectedLab, setSelectedLab] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [togglingDevice, setTogglingDevice] = useState<number | null>(null);
@@ -58,6 +58,48 @@ export default function StudentDashboard() {
     loadLabs();
   }, []);
 
+  /* ---------------------------- Fetch Live Relay States ---------------------------- */
+  const fetchDeviceStates = async (deviceList: Device[]) => {
+    if (!deviceList.length) {
+      setDeviceStates({});
+      return;
+    }
+
+    try {
+      const pins = deviceList.map((d) => d.PinNumber);
+      const res = await axios.post(
+        `${Base_Url}/relay/live-state`,
+        { pins },
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        const map: { [key: number]: DeviceLiveState } = {};
+
+        res.data.states.forEach(
+          (s: { pin: number; state?: number; error?: string }) => {
+            const dev = deviceList.find((d) => d.PinNumber === s.pin);
+            if (!dev) return;
+
+            if (s.error === "unreachable") {
+              map[dev.id] = "unreachable";
+            } else if (s.state === 0) {
+              // 0 => ON
+              map[dev.id] = "on";
+            } else if (s.state === 1) {
+              // 1 => OFF
+              map[dev.id] = "off";
+            }
+          }
+        );
+
+        setDeviceStates(map);
+      }
+    } catch (err) {
+      console.error("[StudentDashboard] Error fetching device states:", err);
+    }
+  };
+
   /* ---------------------------- Load Devices ---------------------------- */
   useEffect(() => {
     const loadDevices = async () => {
@@ -73,13 +115,11 @@ export default function StudentDashboard() {
           }
         );
 
-        const list = res.data?.devices || res.data?.devices || [];
+        const list: Device[] = res.data?.devices || res.data?.devices || [];
         setDevices(list);
 
-        // map to deviceStates
-        const map: any = {};
-        list.forEach((d: Device) => (map[d.id] = d.value));
-        setDeviceStates(map);
+        // Use live relay state instead of DB `value`
+        await fetchDeviceStates(list);
       } catch {
         toast.error("Failed to load devices");
       } finally {
@@ -90,11 +130,25 @@ export default function StudentDashboard() {
     loadDevices();
   }, [selectedLab]);
 
+  /* Optional: periodic live refresh */
+  useEffect(() => {
+    if (!devices.length) return;
+
+    const interval = setInterval(() => {
+      fetchDeviceStates(devices);
+    }, 5000); // 5 seconds
+
+    return () => clearInterval(interval);
+  }, [devices]);
+
   /* ---------------------------- Toggle Device ---------------------------- */
   const toggleDevice = async (device: Device) => {
     if (!device.studentAllowed) return;
 
-    const newState = deviceStates[device.id] ? "off" : "on";
+    const current = deviceStates[device.id];
+    const isOn = current === "on";
+    const newState = isOn ? "off" : "on";
+
     setTogglingDevice(device.id);
 
     try {
@@ -109,10 +163,8 @@ export default function StudentDashboard() {
 
       if (res.data.success) {
         toast.success(`Device turned ${newState.toUpperCase()}`);
-        setDeviceStates((prev) => ({
-          ...prev,
-          [device.id]: newState === "on",
-        }));
+        // Re-sync with live state
+        await fetchDeviceStates([device]);
       }
     } catch {
       toast.error("Failed to toggle device");
@@ -122,7 +174,6 @@ export default function StudentDashboard() {
   };
 
   /* ---------------------------- Student GM/GN APPLY ---------------------------- */
-
   const studentGM = async () => {
     if (selectedLab === "") return toast.error("Select a lab");
 
@@ -148,14 +199,8 @@ export default function StudentDashboard() {
 
       toast.success("Good Morning Applied!");
 
-      // UI update
-      setDeviceStates((prev) => {
-        const u = { ...prev };
-        devices.forEach((d) => {
-          if (allowedIDs.includes(d.id)) u[d.id] = true;
-        });
-        return u;
-      });
+      // Sync UI with live state
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("Failed to apply GM");
     } finally {
@@ -188,13 +233,8 @@ export default function StudentDashboard() {
 
       toast.success("Good Night Applied!");
 
-      setDeviceStates((prev) => {
-        const u = { ...prev };
-        devices.forEach((d) => {
-          if (allowedIDs.includes(d.id)) u[d.id] = false;
-        });
-        return u;
-      });
+      // Sync UI with live state
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("Failed to apply GN");
     } finally {
@@ -216,10 +256,7 @@ export default function StudentDashboard() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <Select
-            value={selectedLab}
-            onValueChange={(v) => setSelectedLab(v)}
-          >
+          <Select value={selectedLab} onValueChange={(v) => setSelectedLab(v)}>
             <SelectTrigger className="w-full md:w-64">
               <SelectValue placeholder="Select Lab" />
             </SelectTrigger>
@@ -234,28 +271,26 @@ export default function StudentDashboard() {
             </SelectContent>
           </Select>
 
-          {/* GM/GN buttons */}
           {/* GM/GN buttons - Only show when a specific lab is selected */}
-{selectedLab !== "all" && devices.length > 0 && (
-  <div className="flex gap-4 pt-2">
-    <Button
-      onClick={studentGM}
-      disabled={togglingAll}
-      className="flex-1 bg-yellow-500 text-white"
-    >
-      <Sunrise className="h-4 w-4 mr-2" /> Good Morning
-    </Button>
+          {selectedLab !== "all" && devices.length > 0 && (
+            <div className="flex gap-4 pt-2">
+              <Button
+                onClick={studentGM}
+                disabled={togglingAll}
+                className="flex-1 bg-yellow-500 text-white"
+              >
+                <Sunrise className="h-4 w-4 mr-2" /> Good Morning
+              </Button>
 
-    <Button
-      onClick={studentGN}
-      disabled={togglingAll}
-      className="flex-1 bg-indigo-600 text-white"
-    >
-      <Moon className="h-4 w-4 mr-2" /> Good Night
-    </Button>
-  </div>
-)}
-
+              <Button
+                onClick={studentGN}
+                disabled={togglingAll}
+                className="flex-1 bg-indigo-600 text-white"
+              >
+                <Moon className="h-4 w-4 mr-2" /> Good Night
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -265,9 +300,10 @@ export default function StudentDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {devices.map((d) => {
-            const isOn = deviceStates[d.id];
-            const blocked =
-              !d.studentAllowed || !d.allowedDevices;
+            const state = deviceStates[d.id];
+            const isOn = state === "on";
+            const isUnreachable = state === "unreachable";
+            const blocked = !d.studentAllowed || !d.allowedDevices;
 
             return (
               <motion.div
@@ -282,7 +318,9 @@ export default function StudentDashboard() {
                   }`}
                   animate={{
                     scale: isOn ? 1.02 : 1,
-                    boxShadow: isOn
+                    boxShadow: isUnreachable
+                      ? "0 0 10px rgba(107,114,128,0.4)"
+                      : isOn
                       ? "0 0 15px rgba(0,255,100,0.3)"
                       : "0 0 10px rgba(255,0,0,0.25)",
                   }}
@@ -307,21 +345,33 @@ export default function StudentDashboard() {
                       {/* Status */}
                       <p className="text-sm">
                         Status:
-                        <span className={`ml-2 font-bold ${isOn ? "text-green-600" : "text-red-600"}`}>
-                          {isOn ? "ON" : "OFF"}
+                        <span
+                          className={`ml-2 font-bold ${
+                            isUnreachable
+                              ? "text-gray-500"
+                              : isOn
+                              ? "text-green-600"
+                              : "text-red-600"
+                          }`}
+                        >
+                          {isUnreachable ? "Unreachable" : isOn ? "ON" : "OFF"}
                         </span>
                       </p>
 
                       {/* Toggle */}
                       <Button
                         className={`w-full flex items-center justify-center gap-2 ${
-                          isOn ? "bg-green-600" : "bg-red-600"
+                          isOn
+                            ? "bg-green-600"
+                            : "bg-red-600"
                         } text-white`}
                         disabled={blocked || togglingDevice === d.id}
                         onClick={() => toggleDevice(d)}
                       >
                         <Power className="w-4 h-4" />
-                        Turn {isOn ? "OFF" : "ON"}
+                        {togglingDevice === d.id
+                          ? "Processing..."
+                          : `Turn ${isOn ? "OFF" : "ON"}`}
                       </Button>
                     </CardContent>
                   </Card>

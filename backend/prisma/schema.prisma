@@ -73,6 +73,7 @@ model user {
    resetToken             String?
   resetTokenExpiry       DateTime?
   last_login             DateTime? @default(now()) @db.Timestamp(6)
+  
 
   alarms Alarm[]
 

@@ -27,12 +27,11 @@ import {
   Sunrise,
   Moon,
   Power,
-  Clock,
-  Users,
   Zap,
   Cpu,
   Building2,
-  GraduationCap
+  GraduationCap,
+  Users
 } from "lucide-react";
 
 import { motion } from "framer-motion";
@@ -64,7 +63,7 @@ interface Device {
 }
 
 interface DeviceState {
-  [key: number]: boolean;
+  [key: number]: "on" | "off" | "unreachable";
 }
 
 /* ------------------------- Component ---------------------------- */
@@ -104,6 +103,48 @@ export default function AdminDashboard() {
     load();
   }, []);
 
+  /* -------------------- Fetch Real Relay States -------------------- */
+  const fetchDeviceStates = async (deviceList: Device[]) => {
+    if (!deviceList.length) {
+      setDeviceStates({});
+      return;
+    }
+
+    try {
+      const pins = deviceList.map((d) => d.PinNumber);
+      const res = await axios.post(
+        `${Base_Url}/relay/live-state`,
+        { pins },
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        const map: DeviceState = {};
+
+        res.data.states.forEach(
+          (s: { pin: number; state?: number; error?: string }) => {
+            const dev = deviceList.find((d) => d.PinNumber === s.pin);
+            if (!dev) return;
+
+            if (s.error === "unreachable") {
+              map[dev.id] = "unreachable";
+            } else if (s.state === 0) {
+              // 0 => ON
+              map[dev.id] = "on";
+            } else if (s.state === 1) {
+              // 1 => OFF
+              map[dev.id] = "off";
+            }
+          }
+        );
+
+        setDeviceStates(map);
+      }
+    } catch (err) {
+      console.error("[AdminDashboard] Error fetching device states:", err);
+    }
+  };
+
   /* -------------------- Load Devices -------------------- */
   useEffect(() => {
     const loadDevices = async () => {
@@ -130,33 +171,13 @@ export default function AdminDashboard() {
     loadDevices();
   }, [selectedLabId]);
 
-  /* -------------------- Fetch Real Relay States -------------------- */
-  const fetchDeviceStates = async (deviceList: Device[]) => {
-    try {
-      const pins = deviceList.map((d) => d.PinNumber);
-      const res = await axios.post(
-        `${Base_Url}/relay/live-state`,
-        { pins },
-        { withCredentials: true }
-      );
-
-      if (res.data.success) {
-        const map: DeviceState = {};
-        res.data.states.forEach((s: { pin: number; state?: string }) => {
-          const dev = deviceList.find((d) => d.PinNumber === s.pin);
-          if (dev) map[dev.id] = s.state === "on";
-        });
-        setDeviceStates(map);
-      }
-    } catch {}
-  };
-
   /* -------------------- Toggle Single Device -------------------- */
   const handleToggleDevice = async (device: Device) => {
     setTogglingDevice(device.id);
 
     try {
-      const newState = deviceStates[device.id] ? "off" : "on";
+      const current = deviceStates[device.id];
+      const newState = current === "on" ? "off" : "on";
 
       const res = await axios.post(
         `${Base_Url}/relay/control`,
@@ -165,38 +186,19 @@ export default function AdminDashboard() {
       );
 
       if (res.data.success) {
-        setDeviceStates((prev) => ({
-          ...prev,
-          [device.id]: newState === "on"
-        }));
-        toast.success(`Device turned ${newState}`);
+        toast.success(
+          `Device "${device.Name}" turned ${newState.toUpperCase()}`
+        );
+        await fetchDeviceStates([device]);
+      } else {
+        toast.error("Failed to toggle device");
       }
-    } catch {
+    } catch (err) {
+      console.error("[AdminDashboard] Failed to toggle device:", err);
       toast.error("Failed to toggle device");
     } finally {
       setTogglingDevice(null);
     }
-  };
-
-  /* -------------------- GM/GN UI Sync Logic -------------------- */
-  const applyGM_UI = () => {
-    setDeviceStates((prev) => {
-      const updated = { ...prev };
-      devices.forEach((d) => {
-        if (d.gmEnabled && d.allowedDevices) updated[d.id] = true;
-      });
-      return updated;
-    });
-  };
-
-  const applyGN_UI = () => {
-    setDeviceStates((prev) => {
-      const updated = { ...prev };
-      devices.forEach((d) => {
-        if (d.gnEnabled && d.allowedDevices) updated[d.id] = false;
-      });
-      return updated;
-    });
   };
 
   /* -------------------- GLOBAL GM/GN -------------------- */
@@ -209,7 +211,7 @@ export default function AdminDashboard() {
         { withCredentials: true }
       );
       toast.success("Global Good Morning Applied!");
-      applyGM_UI();
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("Global GM failed");
     } finally {
@@ -226,7 +228,7 @@ export default function AdminDashboard() {
         { withCredentials: true }
       );
       toast.success("Global Good Night Applied!");
-      applyGN_UI();
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("Global GN failed");
     } finally {
@@ -246,16 +248,7 @@ export default function AdminDashboard() {
         { withCredentials: true }
       );
       toast.success("Lab Good Morning Applied!");
-
-      setDeviceStates((prev) => {
-        const updated = { ...prev };
-        devices
-          .filter((d) => d.labId.toString() === selectedLabId)
-          .forEach((d) => {
-            if (d.gmEnabled && d.allowedDevices) updated[d.id] = true;
-          });
-        return updated;
-      });
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("GM failed");
     } finally {
@@ -275,16 +268,7 @@ export default function AdminDashboard() {
       );
 
       toast.success("Lab Good Night Applied!");
-
-      setDeviceStates((prev) => {
-        const updated = { ...prev };
-        devices
-          .filter((d) => d.labId.toString() === selectedLabId)
-          .forEach((d) => {
-            if (d.gnEnabled && d.allowedDevices) updated[d.id] = false;
-          });
-        return updated;
-      });
+      await fetchDeviceStates(devices);
     } catch {
       toast.error("GN failed");
     } finally {
@@ -297,11 +281,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="m-10 space-y-8">
-
-      {/* ---------------- STATS SECTION RESTORED ---------------- */}
+      {/* ---------------- STATS SECTION ---------------- */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -356,7 +338,6 @@ export default function AdminDashboard() {
               <div className="text-2xl font-bold">{stats.totalFaculty}</div>
             </CardContent>
           </Card>
-
         </div>
       )}
 
@@ -432,12 +413,12 @@ export default function AdminDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {devices.map((device) => {
-            const isOn = deviceStates[device.id];
+            const state = deviceStates[device.id];
+            const isOn = state === "on";
+            const isUnreachable = state === "unreachable";
             const loadingThis = togglingDevice === device.id;
 
-            const blocked =
-              !device.allowedDevices ||
-              (!device.gmEnabled && !device.gnEnabled);
+            const gmGnBlocked = !device.gmEnabled && !device.gnEnabled;
 
             return (
               <motion.div
@@ -447,12 +428,12 @@ export default function AdminDashboard() {
                 transition={{ duration: 0.25 }}
               >
                 <motion.div
-                  className={`rounded-xl ${
-                    blocked ? "opacity-50 pointer-events-none" : ""
-                  }`}
+                  className="rounded-xl"
                   animate={{
                     scale: isOn ? 1.02 : 1,
-                    boxShadow: isOn
+                    boxShadow: isUnreachable
+                      ? "0 0 10px rgba(107,114,128,0.5)"
+                      : isOn
                       ? "0 0 15px rgba(0,255,100,0.4)"
                       : "0 0 10px rgba(255,0,0,0.3)"
                   }}
@@ -463,8 +444,8 @@ export default function AdminDashboard() {
                       <CardTitle>{device.Name}</CardTitle>
                       <CardDescription>Pin {device.PinNumber}</CardDescription>
 
-                      {/* Disabled Label */}
-                      {blocked && (
+                      {/* GM/GN Disabled Label (card still controllable) */}
+                      {gmGnBlocked && (
                         <div className="mt-2 px-2 py-1 text-xs rounded bg-red-200 text-red-700 font-semibold inline-block">
                           Not GM/GN Allowed
                         </div>
@@ -477,15 +458,17 @@ export default function AdminDashboard() {
                         <span>Status</span>
                         <motion.div
                           animate={{
-                            backgroundColor: isOn
-                              ? "rgba(16,185,129,0.3)"
-                              : "rgba(239,68,68,0.3)",
+                            backgroundColor: isUnreachable
+                              ? "rgba(107,114,128,0.4)" // gray
+                              : isOn
+                              ? "rgba(16,185,129,0.3)" // green
+                              : "rgba(239,68,68,0.3)", // red
                             scale: isOn ? 1.1 : 1
                           }}
                           transition={{ duration: 0.3 }}
                           className="px-3 py-1 rounded-full text-sm font-semibold"
                         >
-                          {isOn ? "ON" : "OFF"}
+                          {isUnreachable ? "Unreachable" : isOn ? "ON" : "OFF"}
                         </motion.div>
                       </div>
 
@@ -497,10 +480,17 @@ export default function AdminDashboard() {
                               ? "bg-green-600 hover:bg-green-700 text-white"
                               : "bg-red-600 hover:bg-red-700 text-white"
                           }`}
-                          disabled={loadingThis || blocked}
+                          disabled={loadingThis}
                           onClick={() => handleToggleDevice(device)}
                         >
-                          {loadingThis ? "Processing..." : <><Power className="h-4 w-4 mr-2" /> Turn {isOn ? "OFF" : "ON"}</>}
+                          {loadingThis ? (
+                            "Processing..."
+                          ) : (
+                            <>
+                              <Power className="h-4 w-4 mr-2" />
+                              Turn {isOn ? "OFF" : "ON"}
+                            </>
+                          )}
                         </Button>
                       </motion.div>
                     </CardContent>

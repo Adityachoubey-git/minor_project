@@ -23,6 +23,7 @@ export default function RegisterPage() {
     fullName: "",
     email: "",
     password: "",
+    confirmPassword: "", // 👈 added
     idNumber: "",
     role: "",
   })
@@ -30,6 +31,13 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    // 🔐 simple password confirmation check
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.")
+      return
+    }
+
     setIsLoading(true)
 
     try {
@@ -53,7 +61,6 @@ export default function RegisterPage() {
         setUserId(newUserId)
         setIsSuccess(true)
 
-        // ✅ Save pending verify context for VerifyPage
         if (typeof window !== "undefined") {
           try {
             window.sessionStorage.setItem(
@@ -68,10 +75,11 @@ export default function RegisterPage() {
           }
         }
 
-        // ✅ Redirect to verify page with query params as fallback
         setTimeout(() => {
           router.push(
-            `/verify?email=${encodeURIComponent(newEmail)}&user_id=${encodeURIComponent(newUserId)}`
+            `/verify?email=${encodeURIComponent(newEmail)}&user_id=${encodeURIComponent(
+              newUserId
+            )}`
           )
         }, 1500)
       } else {
@@ -214,6 +222,21 @@ export default function RegisterPage() {
               />
             </div>
 
+            {/* 🔁 Confirm Password */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Confirm Password</label>
+              <Input
+                type="password"
+                name="confirmPassword"
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                className="rounded-lg"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-2">Role</label>
               <Select
@@ -224,7 +247,6 @@ export default function RegisterPage() {
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADMIN">Administrator</SelectItem>
                   <SelectItem value="FACULTY">Faculty</SelectItem>
                   <SelectItem value="STUDENT">Student</SelectItem>
                 </SelectContent>
