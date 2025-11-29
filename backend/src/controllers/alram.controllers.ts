@@ -84,3 +84,171 @@ export const processAlarmsHandler = catchAsyncError(async (_req, res) => {
     executed,
   })
 })
+// ✅ List alarms for Admin/Faculty/Student
+export const getAlarmsHandler = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const authUser = (req as any).user
+    if (!authUser) return next(new ErrorHandler("Unauthorized", 401))
+
+    const { role, id: userId } = authUser
+    const { includeExecuted, state } = req.query
+
+    const where: any = {}
+
+    // Role-based access:
+    if (role === "ADMIN") {
+      // Admin can optionally filter by userId
+      if (req.query.userId) {
+        where.userId = Number(req.query.userId)
+      }
+    } else {
+      // Faculty/Student see only their alarms
+      where.userId = userId
+    }
+
+    if (state && (state === "on" || state === "off")) {
+      where.state = state
+    }
+
+    if (includeExecuted !== "true") {
+      where.executed = false          // by default, only upcoming/pending
+    }
+
+    const alarms = await prisma.alarm.findMany({
+      where,
+      orderBy: { scheduledAt: "desc" },
+      include: {
+        user: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    })
+
+    const formatted = alarms.map((a) => ({
+      id: a.id,
+      userId: a.userId,
+      devices: JSON.parse(a.deviceIds) as number[],
+      state: a.state,                 // "on" | "off"
+      scheduledAt: a.scheduledAt,
+      executed: a.executed,
+      enabled: a.enabled,
+      createdAt: a.createdAt,
+      user: a.user,
+    }))
+
+    res.status(200).json({
+      success: true,
+      alarms: formatted,
+    })
+  },
+)
+export const getSingleAlarmHandler = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const authUser = (req as any).user
+    if (!authUser) return next(new ErrorHandler("Unauthorized", 401))
+
+    const alarmId = Number(req.params.id)
+
+    const alarm = await prisma.alarm.findUnique({
+      where: { id: alarmId },
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    })
+
+    if (!alarm) {
+      return next(new ErrorHandler("Alarm not found", 404))
+    }
+
+    // Access control: non-admin can only see their own alarm
+    if (authUser.role !== "ADMIN" && alarm.userId !== authUser.id) {
+      return next(new ErrorHandler("Forbidden", 403))
+    }
+
+    const formatted = {
+      id: alarm.id,
+      userId: alarm.userId,
+      devices: JSON.parse(alarm.deviceIds) as number[],
+      state: alarm.state,
+      scheduledAt: alarm.scheduledAt,
+      executed: alarm.executed,
+      enabled: alarm.enabled,
+      createdAt: alarm.createdAt,
+      user: alarm.user,
+    }
+
+    res.status(200).json({
+      success: true,
+      alarm: formatted,
+    })
+  },
+)
+export const toggleAlarmEnabledHandler = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const authUser = (req as any).user
+    if (!authUser) return next(new ErrorHandler("Unauthorized", 401))
+
+    const alarmId = Number(req.params.id)
+    const { enabled } = req.body
+
+    if (typeof enabled !== "boolean") {
+      return next(new ErrorHandler("Body must be { enabled: boolean }", 400))
+    }
+
+    const alarm = await prisma.alarm.findUnique({ where: { id: alarmId } })
+
+    if (!alarm) {
+      return next(new ErrorHandler("Alarm not found", 404))
+    }
+
+    // Only admin or owner can change
+    if (authUser.role !== "ADMIN" && alarm.userId !== authUser.id) {
+      return next(new ErrorHandler("Forbidden", 403))
+    }
+
+    const updated = await prisma.alarm.update({
+      where: { id: alarmId },
+      data: { enabled },
+    })
+
+    res.status(200).json({
+      success: true,
+      message: `Alarm ${enabled ? "enabled" : "disabled"}`,
+      alarm: {
+        id: updated.id,
+        userId: updated.userId,
+        devices: JSON.parse(updated.deviceIds) as number[],
+        state: updated.state,
+        scheduledAt: updated.scheduledAt,
+        executed: updated.executed,
+        enabled: updated.enabled,
+        createdAt: updated.createdAt,
+      },
+    })
+  },
+)
+export const deleteAlarmHandler = catchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const authUser = (req as any).user
+    if (!authUser) return next(new ErrorHandler("Unauthorized", 401))
+
+    const alarmId = Number(req.params.id)
+
+    const alarm = await prisma.alarm.findUnique({ where: { id: alarmId } })
+
+    if (!alarm) {
+      return next(new ErrorHandler("Alarm not found", 404))
+    }
+
+    if (authUser.role !== "ADMIN" && alarm.userId !== authUser.id) {
+      return next(new ErrorHandler("Forbidden", 403))
+    }
+
+    await prisma.alarm.delete({ where: { id: alarmId } })
+
+    res.status(200).json({
+      success: true,
+      message: "Alarm deleted",
+    })
+  },
+)

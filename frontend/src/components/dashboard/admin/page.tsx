@@ -31,7 +31,8 @@ import {
   Cpu,
   Building2,
   GraduationCap,
-  Users
+  Users,
+  Clock            // ⭐ NEW
 } from "lucide-react";
 
 import { motion } from "framer-motion";
@@ -77,7 +78,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [togglingDevice, setTogglingDevice] = useState<number | null>(null);
   const [togglingAllDevices, setTogglingAllDevices] = useState(false);
-  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false);
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false); // already there
 
   /* -------------------- Load Stats + Labs -------------------- */
   useEffect(() => {
@@ -173,34 +174,33 @@ export default function AdminDashboard() {
 
   /* -------------------- Toggle Single Device -------------------- */
   const handleToggleDevice = async (device: Device) => {
-  setTogglingDevice(device.id);
+    setTogglingDevice(device.id);
 
-  try {
-    const current = deviceStates[device.id];
-    const newState = current === "on" ? "off" : "on";
+    try {
+      const current = deviceStates[device.id];
+      const newState = current === "on" ? "off" : "on";
 
-    const res = await axios.post(
-      `${Base_Url}/relay/control`,
-      { deviceIds: [device.id], state: newState },
-      { withCredentials: true }
-    );
-
-    if (res.data.success) {
-      toast.success(
-        `Device "${device.Name}" turned ${newState.toUpperCase()}`
+      const res = await axios.post(
+        `${Base_Url}/relay/control`,
+        { deviceIds: [device.id], state: newState },
+        { withCredentials: true }
       );
-      // ⬇️ fetch states for ALL currently loaded devices
-      await fetchDeviceStates(devices);
-    } else {
+
+      if (res.data.success) {
+        toast.success(
+          `Device "${device.Name}" turned ${newState.toUpperCase()}`
+        );
+        await fetchDeviceStates(devices);
+      } else {
+        toast.error("Failed to toggle device");
+      }
+    } catch (err) {
+      console.error("[AdminDashboard] Failed to toggle device:", err);
       toast.error("Failed to toggle device");
+    } finally {
+      setTogglingDevice(null);
     }
-  } catch (err) {
-    console.error("[AdminDashboard] Failed to toggle device:", err);
-    toast.error("Failed to toggle device");
-  } finally {
-    setTogglingDevice(null);
-  }
-};
+  };
 
   /* -------------------- GLOBAL GM/GN -------------------- */
   const handleGlobalGoodMorning = async () => {
@@ -341,6 +341,17 @@ export default function AdminDashboard() {
           </Card>
         </div>
       )}
+
+      {/* ⭐ Set Alarm Button (reference-style, no other logic changed) */}
+      <div className="flex justify-end">
+        <Button
+          className="gap-2"
+          onClick={() => setIsAlarmModalOpen(true)}
+        >
+          <Clock className="h-4 w-4" />
+          Set Alarm
+        </Button>
+      </div>
 
       {/* ---------------- GLOBAL GM/GN BUTTONS ---------------- */}
       <div className="flex gap-4">

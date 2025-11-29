@@ -70,7 +70,7 @@ model user {
   emailverificationCode  String?
   emailverified          Boolean   @default(false)
   verificationCodeExpire String?
-   resetToken             String?
+  resetToken             String?
   resetTokenExpiry       DateTime?
   last_login             DateTime? @default(now()) @db.Timestamp(6)
   isActive   Boolean   @default(true) 
@@ -94,6 +94,7 @@ model Alarm {
   scheduledAt DateTime
   executed    Boolean    @default(false)
   createdAt   DateTime   @default(now())
+  enabled     Boolean    @default(true)
 
   user        user       @relation(fields: [userId], references: [id])
 }

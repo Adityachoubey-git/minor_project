@@ -1,6 +1,6 @@
 "use client"
 
-import { LayoutDashboard, Users, BookOpen, BarChart3 } from "lucide-react"
+import { LayoutDashboard, Users, BookOpen, BarChart3, Clock } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -8,9 +8,10 @@ export function FacultySidebar() {
   const pathname = usePathname()
 
   const menuItems = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-   { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
-    { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: Users, label: "Users Activities", href: "/dashboard/activities" },
+  { icon: Users, label: "My Activities", href: "/dashboard/myActivities" },
+  { icon: Clock, label: "Alarm Management", href: "/dashboard/AlarmManagement" },
   ]
 
   return (

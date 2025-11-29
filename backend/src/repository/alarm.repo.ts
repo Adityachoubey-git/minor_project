@@ -14,9 +14,14 @@ export async function createAlarmRepo(userId: number, deviceIds: number[], state
 
 export async function getPendingAlarmsRepo() {
   return prisma.alarm.findMany({
-    where: { executed: false, scheduledAt: { lte: new Date() } },
+    where: {
+      executed: false,
+      enabled: true,                 
+      scheduledAt: { lte: new Date() },
+    },
   })
 }
+
 
 export async function markAlarmExecutedRepo(id: number) {
   return prisma.alarm.update({
