@@ -58,7 +58,7 @@ export function Header({ onSidebarToggle, mobileSidebar }: HeaderProps) {
           <Link href="/dashboard" className="flex items-center gap-2 font-bold text-lg">
                <div className="w-10 h-10 rounded-[75px] border-2 border-white flex items-center justify-center shadow-lg overflow-hidden">
   <img
-    src="labautonomylogo.jpeg"
+    src="/labautonomylogo.jpeg"
     alt="Lab Autonomy"
     className="w-full h-full object-cover rounded-[75px] border-2 border-white"
   />
