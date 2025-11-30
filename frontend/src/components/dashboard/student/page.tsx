@@ -4,13 +4,26 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Base_Url from "@/hooks/Baseurl";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectTrigger, SelectItem, SelectValue, SelectContent } from "@/components/ui/select";
+import {
+  Select,
+  SelectTrigger,
+  SelectItem,
+  SelectValue,
+  SelectContent
+} from "@/components/ui/select";
 
 import { Zap, Sunrise, Moon, Power } from "lucide-react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import { Loader } from "@/components/loader";
 
 /* ---------------------------- Types ---------------------------- */
 interface Lab {
@@ -35,7 +48,9 @@ type DeviceLiveState = "on" | "off" | "unreachable";
 export default function StudentDashboard() {
   const [labs, setLabs] = useState<Lab[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [deviceStates, setDeviceStates] = useState<{ [key: number]: DeviceLiveState }>({});
+  const [deviceStates, setDeviceStates] = useState<{
+    [key: number]: DeviceLiveState;
+  }>({});
   const [selectedLab, setSelectedLab] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [togglingDevice, setTogglingDevice] = useState<number | null>(null);
@@ -47,7 +62,7 @@ export default function StudentDashboard() {
       try {
         const res = await axios.get(`${Base_Url}/lab/get`, {
           params: { limit: 200 },
-          withCredentials: true,
+          withCredentials: true
         });
         setLabs(res.data?.labs || []);
       } catch {
@@ -105,17 +120,15 @@ export default function StudentDashboard() {
     const loadDevices = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
-          selectedLab === "all"
-            ? `${Base_Url}/devices/get`
-            : `${Base_Url}/devices/lab/${selectedLab}`,
-          {
-            params: selectedLab === "all" ? { limit: 200 } : {},
-            withCredentials: true,
-          }
-        );
+        const res = await axios.get(`${Base_Url}/devices/get`, {
+          params:
+            selectedLab === "all"
+              ? { limit: 200 }
+              : { labId: selectedLab, limit: 200 },
+          withCredentials: true
+        });
 
-        const list: Device[] = res.data?.devices || res.data?.devices || [];
+        const list: Device[] = res.data?.devices || [];
         setDevices(list);
 
         // Use live relay state instead of DB `value`
@@ -143,9 +156,17 @@ export default function StudentDashboard() {
 
   /* ---------------------------- Toggle Device ---------------------------- */
   const toggleDevice = async (device: Device) => {
-    if (!device.studentAllowed) return;
+    if (!device.studentAllowed || !device.allowedDevices) {
+      toast.error("This device is not allowed for students");
+      return;
+    }
 
     const current = deviceStates[device.id];
+    if (current === "unreachable") {
+      toast.error("Device is unreachable");
+      return;
+    }
+
     const isOn = current === "on";
     const newState = isOn ? "off" : "on";
 
@@ -156,7 +177,7 @@ export default function StudentDashboard() {
         `${Base_Url}/relay/control`,
         {
           deviceIds: [device.id],
-          state: newState,
+          state: newState
         },
         { withCredentials: true }
       );
@@ -164,7 +185,9 @@ export default function StudentDashboard() {
       if (res.data.success) {
         toast.success(`Device turned ${newState.toUpperCase()}`);
         // Re-sync with live state
-        await fetchDeviceStates([device]);
+        await fetchDeviceStates(devices);
+      } else {
+        toast.error("Failed to toggle device");
       }
     } catch {
       toast.error("Failed to toggle device");
@@ -175,7 +198,8 @@ export default function StudentDashboard() {
 
   /* ---------------------------- Student GM/GN APPLY ---------------------------- */
   const studentGM = async () => {
-    if (selectedLab === "") return toast.error("Select a lab");
+    if (selectedLab === "all")
+      return toast.error("Select a specific lab for Good Morning");
 
     setTogglingAll(true);
     try {
@@ -185,22 +209,26 @@ export default function StudentDashboard() {
             d.studentAllowed &&
             d.allowedDevices &&
             d.gmEnabled &&
-            (selectedLab === "all" || d.labId.toString() === selectedLab)
+            d.labId.toString() === selectedLab
         )
         .map((d) => d.id);
 
-      if (allowedIDs.length === 0) return toast.error("No GM-enabled devices allowed");
+      if (allowedIDs.length === 0)
+        return toast.error("No GM-enabled devices allowed in this lab");
 
-      await axios.post(
+      const res = await axios.post(
         `${Base_Url}/relay/control`,
         { deviceIds: allowedIDs, state: "on" },
         { withCredentials: true }
       );
 
-      toast.success("Good Morning Applied!");
-
-      // Sync UI with live state
-      await fetchDeviceStates(devices);
+      if (res.data.success) {
+        toast.success("Good Morning Applied!");
+        // Sync UI with live state
+        await fetchDeviceStates(devices);
+      } else {
+        toast.error("Failed to apply GM");
+      }
     } catch {
       toast.error("Failed to apply GM");
     } finally {
@@ -209,7 +237,8 @@ export default function StudentDashboard() {
   };
 
   const studentGN = async () => {
-    if (selectedLab === "") return toast.error("Select a lab");
+    if (selectedLab === "all")
+      return toast.error("Select a specific lab for Good Night");
 
     setTogglingAll(true);
     try {
@@ -219,22 +248,26 @@ export default function StudentDashboard() {
             d.studentAllowed &&
             d.allowedDevices &&
             d.gnEnabled &&
-            (selectedLab === "all" || d.labId.toString() === selectedLab)
+            d.labId.toString() === selectedLab
         )
         .map((d) => d.id);
 
-      if (allowedIDs.length === 0) return toast.error("No GN-enabled devices allowed");
+      if (allowedIDs.length === 0)
+        return toast.error("No GN-enabled devices allowed in this lab");
 
-      await axios.post(
+      const res = await axios.post(
         `${Base_Url}/relay/control`,
         { deviceIds: allowedIDs, state: "off" },
         { withCredentials: true }
       );
 
-      toast.success("Good Night Applied!");
-
-      // Sync UI with live state
-      await fetchDeviceStates(devices);
+      if (res.data.success) {
+        toast.success("Good Night Applied!");
+        // Sync UI with live state
+        await fetchDeviceStates(devices);
+      } else {
+        toast.error("Failed to apply GN");
+      }
     } catch {
       toast.error("Failed to apply GN");
     } finally {
@@ -243,6 +276,9 @@ export default function StudentDashboard() {
   };
 
   /* ---------------------------- UI ---------------------------- */
+
+  if (loading && !devices.length) return <Loader fullScreen />;
+
   return (
     <div className="m-10 space-y-8">
       {/* ---------------- Header ---------------- */}
@@ -252,7 +288,9 @@ export default function StudentDashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Select Lab</CardTitle>
-          <CardDescription>Choose which lab you want to control</CardDescription>
+          <CardDescription>
+            Choose which lab you want to control
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
@@ -304,6 +342,7 @@ export default function StudentDashboard() {
             const isOn = state === "on";
             const isUnreachable = state === "unreachable";
             const blocked = !d.studentAllowed || !d.allowedDevices;
+            const isLoading = togglingDevice === d.id;
 
             return (
               <motion.div
@@ -322,7 +361,7 @@ export default function StudentDashboard() {
                       ? "0 0 10px rgba(107,114,128,0.4)"
                       : isOn
                       ? "0 0 15px rgba(0,255,100,0.3)"
-                      : "0 0 10px rgba(255,0,0,0.25)",
+                      : "0 0 10px rgba(255,0,0,0.25)"
                   }}
                   transition={{ type: "spring", stiffness: 150, damping: 15 }}
                 >
@@ -339,40 +378,56 @@ export default function StudentDashboard() {
                           Not Allowed for Students
                         </p>
                       )}
+                      {d.studentAllowed && !d.allowedDevices && (
+                        <p className="text-xs mt-2 text-red-500 font-semibold">
+                          Disabled by Admin
+                        </p>
+                      )}
                     </CardHeader>
 
                     <CardContent className="space-y-4">
                       {/* Status */}
-                      <p className="text-sm">
-                        Status:
-                        <span
-                          className={`ml-2 font-bold ${
-                            isUnreachable
-                              ? "text-gray-500"
+                      <div className="flex justify-between items-center p-3 bg-muted rounded">
+                        <span className="text-sm">Status</span>
+                        <motion.span
+                          animate={{
+                            backgroundColor: isUnreachable
+                              ? "rgba(107,114,128,0.4)"
                               : isOn
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
+                              ? "rgba(16,185,129,0.3)"
+                              : "rgba(239,68,68,0.3)",
+                            scale: isOn ? 1.1 : 1
+                          }}
+                          transition={{ duration: 0.3 }}
+                          className="px-3 py-1 rounded-full text-sm font-semibold"
                         >
-                          {isUnreachable ? "Unreachable" : isOn ? "ON" : "OFF"}
-                        </span>
-                      </p>
+                          {isUnreachable
+                            ? "Unreachable"
+                            : isOn
+                            ? "ON"
+                            : "OFF"}
+                        </motion.span>
+                      </div>
 
                       {/* Toggle */}
-                      <Button
-                        className={`w-full flex items-center justify-center gap-2 ${
-                          isOn
-                            ? "bg-green-600"
-                            : "bg-red-600"
-                        } text-white`}
-                        disabled={blocked || togglingDevice === d.id}
-                        onClick={() => toggleDevice(d)}
-                      >
-                        <Power className="w-4 h-4" />
-                        {togglingDevice === d.id
-                          ? "Processing..."
-                          : `Turn ${isOn ? "OFF" : "ON"}`}
-                      </Button>
+                      <motion.div whileTap={{ scale: 0.96 }}>
+                        <Button
+                          className={`w-full flex items-center justify-center gap-2 ${
+                            isOn
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-red-600 hover:bg-red-700"
+                          } text-white`}
+                          disabled={
+                            blocked || isLoading || isUnreachable
+                          }
+                          onClick={() => toggleDevice(d)}
+                        >
+                          <Power className="w-4 h-4" />
+                          {isLoading
+                            ? "Processing..."
+                            : `Turn ${isOn ? "OFF" : "ON"}`}
+                        </Button>
+                      </motion.div>
                     </CardContent>
                   </Card>
                 </motion.div>

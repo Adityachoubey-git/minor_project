@@ -23,12 +23,7 @@ import {
 } from "@/components/ui/select";
 
 import { toast } from "sonner";
-import {
-  Power,
-  Sunrise,
-  Moon,
-  Clock
-} from "lucide-react";
+import { Power, Sunrise, Moon, Clock } from "lucide-react";
 
 import { motion } from "framer-motion";
 import SetAlarmModal from "../admin/components/set-alarm-modal";
@@ -47,10 +42,13 @@ interface Device {
   PinNumber: number;
   labId: number;
   allowedDevices: boolean;
+  gmEnabled?: boolean;
+  gnEnabled?: boolean;
+  studentAllowed?: boolean;
 }
 
 interface DeviceState {
-  [key: number]: boolean;
+  [key: number]: "on" | "off" | "unreachable";
 }
 
 /* ---------------------------------------------------------
@@ -90,22 +88,64 @@ export default function FacultyDashboard() {
   }, []);
 
   /* ---------------------------------------------------------
+     FETCH LIVE STATES (NEW FORMAT: 0/1 + unreachable)
+--------------------------------------------------------- */
+  const fetchDeviceStates = async (deviceList: Device[]) => {
+    if (!deviceList.length) {
+      setDeviceStates({});
+      return;
+    }
+
+    try {
+      const pins = deviceList.map((d) => d.PinNumber);
+
+      const res = await axios.post(
+        `${Base_Url}/relay/live-state`,
+        { pins },
+        { withCredentials: true }
+      );
+
+      if (res.data.success) {
+        const map: DeviceState = {};
+
+        res.data.states.forEach(
+          (s: { pin: number; state?: number; error?: string }) => {
+            const dev = deviceList.find((d) => d.PinNumber === s.pin);
+            if (!dev) return;
+
+            if (s.error === "unreachable") {
+              map[dev.id] = "unreachable";
+            } else if (s.state === 0) {
+              // 0 => ON
+              map[dev.id] = "on";
+            } else if (s.state === 1) {
+              // 1 => OFF
+              map[dev.id] = "off";
+            }
+          }
+        );
+
+        setDeviceStates(map);
+      }
+    } catch {
+      // optional: console.error
+    }
+  };
+
+  /* ---------------------------------------------------------
      LOAD DEVICES — ALL devices on load
 --------------------------------------------------------- */
   useEffect(() => {
     const loadDevices = async () => {
       setLoading(true);
       try {
-        const res = await axios.get(
-          `${Base_Url}/devices/get`,
-          {
-            params:
-              selectedLabId === "all"
-                ? { limit: 200 }
-                : { labId: selectedLabId, limit: 200 },
-            withCredentials: true
-          }
-        );
+        const res = await axios.get(`${Base_Url}/devices/get`, {
+          params:
+            selectedLabId === "all"
+              ? { limit: 200 }
+              : { labId: selectedLabId, limit: 200 },
+          withCredentials: true
+        });
 
         if (res.data.success) {
           setDevices(res.data.devices);
@@ -122,32 +162,6 @@ export default function FacultyDashboard() {
   }, [selectedLabId]);
 
   /* ---------------------------------------------------------
-     FETCH LIVE STATES
---------------------------------------------------------- */
-  const fetchDeviceStates = async (deviceList: Device[]) => {
-    try {
-      const pins = deviceList.map((d) => d.PinNumber);
-
-      const res = await axios.post(
-        `${Base_Url}/relay/live-state`,
-        { pins },
-        { withCredentials: true }
-      );
-
-      if (res.data.success) {
-        const map: DeviceState = {};
-
-        res.data.states.forEach((s: { pin: number; state?: string }) => {
-          const dev = deviceList.find((d) => d.PinNumber === s.pin);
-          if (dev) map[dev.id] = s.state === "on";
-        });
-
-        setDeviceStates(map);
-      }
-    } catch {}
-  };
-
-  /* ---------------------------------------------------------
      TOGGLE A SINGLE DEVICE
 --------------------------------------------------------- */
   const handleToggleDevice = async (device: Device) => {
@@ -155,7 +169,8 @@ export default function FacultyDashboard() {
       return toast.error("This device is restricted by admin");
 
     setTogglingDevice(device.id);
-    const newState = deviceStates[device.id] ? "off" : "on";
+    const current = deviceStates[device.id];
+    const newState = current === "on" ? "off" : "on";
 
     try {
       const res = await axios.post(
@@ -166,11 +181,9 @@ export default function FacultyDashboard() {
 
       if (res.data.success) {
         toast.success(`Device turned ${newState.toUpperCase()}`);
-
-        setDeviceStates((prev) => ({
-          ...prev,
-          [device.id]: newState === "on"
-        }));
+        await fetchDeviceStates(devices);
+      } else {
+        toast.error("Failed to toggle device");
       }
     } catch {
       toast.error("Failed to toggle device");
@@ -180,7 +193,7 @@ export default function FacultyDashboard() {
   };
 
   /* ---------------------------------------------------------
-     GOOD MORNING — FACULTY ALLOWED ONLY
+     GOOD MORNING — FACULTY ALLOWED ONLY (ALLOWED DEVICES)
 --------------------------------------------------------- */
   const handleGoodMorning = async () => {
     if (selectedLabId === "all")
@@ -209,10 +222,14 @@ export default function FacultyDashboard() {
         toast.success("Good Morning Applied!");
 
         setDeviceStates((prev) => {
-          const updated = { ...prev };
-          allowedIds.forEach((id) => (updated[id] = true));
+          const updated: DeviceState = { ...prev };
+          allowedIds.forEach((id) => {
+            updated[id] = "on";
+          });
           return updated;
         });
+      } else {
+        toast.error("Failed to apply Good Morning");
       }
     } catch {
       toast.error("Failed to apply Good Morning");
@@ -222,7 +239,7 @@ export default function FacultyDashboard() {
   };
 
   /* ---------------------------------------------------------
-     GOOD NIGHT — FACULTY ALLOWED ONLY
+     GOOD NIGHT — FACULTY ALLOWED ONLY (ALLOWED DEVICES)
 --------------------------------------------------------- */
   const handleGoodNight = async () => {
     if (selectedLabId === "all")
@@ -251,10 +268,14 @@ export default function FacultyDashboard() {
         toast.success("Good Night Applied!");
 
         setDeviceStates((prev) => {
-          const updated = { ...prev };
-          allowedIds.forEach((id) => (updated[id] = false));
+          const updated: DeviceState = { ...prev };
+          allowedIds.forEach((id) => {
+            updated[id] = "off";
+          });
           return updated;
         });
+      } else {
+        toast.error("Failed to apply Good Night");
       }
     } catch {
       toast.error("Failed to apply Good Night");
@@ -271,7 +292,6 @@ export default function FacultyDashboard() {
 
   return (
     <div className="m-10 space-y-8">
-
       {/* ---------- Header ---------- */}
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Faculty Dashboard</h1>
@@ -342,7 +362,9 @@ export default function FacultyDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {devices.map((device) => {
-          const isOn = deviceStates[device.id];
+          const state = deviceStates[device.id];
+          const isOn = state === "on";
+          const isUnreachable = state === "unreachable";
           const isBlocked = !device.allowedDevices;
           const isLoading = togglingDevice === device.id;
 
@@ -355,11 +377,13 @@ export default function FacultyDashboard() {
             >
               <motion.div
                 className={`rounded-xl ${
-                  isBlocked ? "opacity-50 pointer-events-none" : ""
+                  isBlocked ? "opacity-60 pointer-events-none" : ""
                 }`}
                 animate={{
                   scale: isOn ? 1.02 : 1,
-                  boxShadow: isOn
+                  boxShadow: isUnreachable
+                    ? "0 0 10px rgba(107,114,128,0.5)"
+                    : isOn
                     ? "0 0 15px rgba(0,255,100,0.4)"
                     : "0 0 10px rgba(255,0,0,0.3)"
                 }}
@@ -368,9 +392,7 @@ export default function FacultyDashboard() {
                 <Card>
                   <CardHeader>
                     <CardTitle>{device.Name}</CardTitle>
-                    <CardDescription>
-                      Pin {device.PinNumber}
-                    </CardDescription>
+                    <CardDescription>Pin {device.PinNumber}</CardDescription>
 
                     {isBlocked && (
                       <span className="text-xs mt-2 bg-red-200 text-red-600 px-2 py-1 rounded">
@@ -383,30 +405,43 @@ export default function FacultyDashboard() {
                     {/* STATUS */}
                     <div className="flex justify-between items-center p-3 bg-muted rounded">
                       <span>Status</span>
-                      <span
-                        className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                          isOn
-                            ? "bg-green-500/20 text-green-600"
-                            : "bg-red-500/20 text-red-600"
-                        }`}
+                      <motion.div
+                        animate={{
+                          backgroundColor: isUnreachable
+                            ? "rgba(107,114,128,0.4)" // gray
+                            : isOn
+                            ? "rgba(16,185,129,0.3)" // green
+                            : "rgba(239,68,68,0.3)", // red
+                          scale: isOn ? 1.1 : 1
+                        }}
+                        transition={{ duration: 0.3 }}
+                        className="px-3 py-1 rounded-full text-sm font-semibold"
                       >
-                        {isOn ? "ON" : "OFF"}
-                      </span>
+                        {isUnreachable
+                          ? "Unreachable"
+                          : isOn
+                          ? "ON"
+                          : "OFF"}
+                      </motion.div>
                     </div>
 
                     {/* TOGGLE BUTTON */}
-                    <Button
-                      onClick={() => handleToggleDevice(device)}
-                      disabled={isLoading || isBlocked}
-                      className={`w-full gap-2 ${
-                        isOn
-                          ? "bg-green-600 hover:bg-green-700 text-white"
-                          : "bg-red-600 hover:bg-red-700 text-white"
-                      }`}
-                    >
-                      <Power className="h-4 w-4" />
-                      {isLoading ? "Processing..." : `Turn ${isOn ? "OFF" : "ON"}`}
-                    </Button>
+                    <motion.div whileTap={{ scale: 0.95 }}>
+                      <Button
+                        onClick={() => handleToggleDevice(device)}
+                        disabled={isLoading || isBlocked || isUnreachable}
+                        className={`w-full gap-2 ${
+                          isOn
+                            ? "bg-green-600 hover:bg-green-700 text-white"
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
+                      >
+                        <Power className="h-4 w-4" />
+                        {isLoading
+                          ? "Processing..."
+                          : `Turn ${isOn ? "OFF" : "ON"}`}
+                      </Button>
+                    </motion.div>
                   </CardContent>
                 </Card>
               </motion.div>
