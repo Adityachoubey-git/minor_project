@@ -12,33 +12,106 @@ const ESP32_IP = process.env.ESP32_IP || "http://192.168.1.50" // example
 // ✅ Create Alarm (user schedules ON/OFF)
 export const createAlarmHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
-    const { deviceIds, state, date, time } = req.body
+    const { deviceIds, state, date, time, recurrenceType = "once", daysOfWeek } = req.body
     const user = (req as any).user
 
     if (!user) return next(new ErrorHandler("Unauthorized", 401))
     if (!Array.isArray(deviceIds) || !["on", "off"].includes(state))
-      return next(new ErrorHandler("Body → { deviceIds:[1,2], state:'on'|'off', date:'YYYY-MM-DD', time:'HH:mm' }", 400))
+      return next(
+        new ErrorHandler(
+          "Body → { deviceIds:[1,2], state:'on'|'off', date:'YYYY-MM-DD', time:'HH:mm', recurrenceType?:'once'|'daily'|'weekly', daysOfWeek?:['mon','tue'] }",
+          400,
+        ),
+      )
+
+    const allowedTypes = ["once", "daily", "weekly"]
+    if (!allowedTypes.includes(recurrenceType)) {
+      return next(new ErrorHandler("Invalid recurrenceType", 400))
+    }
+
+    let daysArr: string[] | undefined
+    if (recurrenceType === "weekly") {
+      if (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0) {
+        return next(new ErrorHandler("For weekly recurrence, daysOfWeek[] is required", 400))
+      }
+      daysArr = daysOfWeek
+    }
 
     const scheduledAt = new Date(`${date}T${time}:00`)
-
     if (isNaN(scheduledAt.getTime()))
       return next(new ErrorHandler("Invalid date/time format", 400))
 
-    // 🔒 Role validation
     if (user.role === "STUDENT")
       return next(new ErrorHandler("Students cannot set alarms", 403))
 
-    // Save alarm
-    const alarm = await createAlarmRepo(user.id, deviceIds, state, scheduledAt)
+    const alarm = await createAlarmRepo(
+      user.id,
+      deviceIds,
+      state,
+      scheduledAt,
+      recurrenceType,
+      daysArr,
+    )
 
     res.status(201).json({
       success: true,
-      message: `Alarm scheduled to turn ${state} ${deviceIds.length > 1 ? "devices" : "device"} at ${scheduledAt.toLocaleString()}`,
+      message: `Alarm (${recurrenceType}) scheduled to turn ${state} ${
+        deviceIds.length > 1 ? "devices" : "device"
+      } starting at ${scheduledAt.toLocaleString()}`,
       alarm,
     })
-  }
+  },
 )
+function computeNextScheduledAt(alarm: any): Date | null {
+  const current = alarm.scheduledAt as Date
+  const type = alarm.recurrenceType || "once"
 
+  if (type === "daily") {
+    const next = new Date(current)
+    next.setDate(current.getDate() + 1)
+    return next
+  }
+
+  if (type === "weekly") {
+    if (!alarm.daysOfWeek) return null
+    let days: string[]
+    try {
+      days = JSON.parse(alarm.daysOfWeek)
+    } catch {
+      return null
+    }
+    if (!Array.isArray(days) || days.length === 0) return null
+
+    const map: Record<string, number> = {
+      sun: 0,
+      mon: 1,
+      tue: 2,
+      wed: 3,
+      thu: 4,
+      fri: 5,
+      sat: 6,
+    }
+
+    const currentDow = current.getDay()
+    let bestDelta: number | null = null
+
+    for (const d of days) {
+      const targetDow = map[d]
+      if (typeof targetDow !== "number") continue
+      let delta = targetDow - currentDow
+      if (delta <= 0) delta += 7
+      if (bestDelta === null || delta < bestDelta) bestDelta = delta
+    }
+
+    if (bestDelta === null) return null
+    const next = new Date(current)
+    next.setDate(current.getDate() + bestDelta)
+    return next
+  }
+
+  // once
+  return null
+}
 // ✅ Background processor — triggers alarms automatically
 export const processAlarmsHandler = catchAsyncError(async (_req, res) => {
   const pending = await getPendingAlarmsRepo()
@@ -47,11 +120,15 @@ export const processAlarmsHandler = catchAsyncError(async (_req, res) => {
   for (const alarm of pending) {
     const deviceIds: number[] = JSON.parse(alarm.deviceIds)
     const state = alarm.state
+    const devices = await prisma.devices.findMany({
+      where: { id: { in: deviceIds } },
+    })
 
-    const devices = await prisma.devices.findMany({ where: { id: { in: deviceIds } } })
     for (const dev of devices) {
       try {
-        await axios.get(`${ESP32_IP}/setState?pin=${dev.PinNumber}&state=${state}`)
+        await axios.get(
+          `${ESP32_IP}/setState?pin=${dev.PinNumber}&state=${state}`,
+        )
         await updateDeviceStateRepo(dev.id, state === "on")
         await prisma.command.create({
           data: {
@@ -73,8 +150,26 @@ export const processAlarmsHandler = catchAsyncError(async (_req, res) => {
       }
     }
 
-    await markAlarmExecutedRepo(alarm.id)
-    executed.push({ alarmId: alarm.id, devices: deviceIds, state })
+    const nextAt = computeNextScheduledAt(alarm)
+
+    if (nextAt) {
+      // recurring – update to next occurrence, keep executed=false
+      await prisma.alarm.update({
+        where: { id: alarm.id },
+        data: { scheduledAt: nextAt },
+      })
+    } else {
+      // one-time – mark as executed
+      await markAlarmExecutedRepo(alarm.id)
+    }
+
+    executed.push({
+      alarmId: alarm.id,
+      devices: deviceIds,
+      state,
+      recurrenceType: alarm.recurrenceType,
+      nextScheduledAt: nextAt || null,
+    })
   }
 
   res.status(200).json({
@@ -84,6 +179,7 @@ export const processAlarmsHandler = catchAsyncError(async (_req, res) => {
     executed,
   })
 })
+
 // ✅ List alarms for Admin/Faculty/Student
 export const getAlarmsHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -95,14 +191,11 @@ export const getAlarmsHandler = catchAsyncError(
 
     const where: any = {}
 
-    // Role-based access:
     if (role === "ADMIN") {
-      // Admin can optionally filter by userId
       if (req.query.userId) {
         where.userId = Number(req.query.userId)
       }
     } else {
-      // Faculty/Student see only their alarms
       where.userId = userId
     }
 
@@ -111,7 +204,7 @@ export const getAlarmsHandler = catchAsyncError(
     }
 
     if (includeExecuted !== "true") {
-      where.executed = false          // by default, only upcoming/pending
+      where.executed = false
     }
 
     const alarms = await prisma.alarm.findMany({
@@ -128,11 +221,13 @@ export const getAlarmsHandler = catchAsyncError(
       id: a.id,
       userId: a.userId,
       devices: JSON.parse(a.deviceIds) as number[],
-      state: a.state,                 // "on" | "off"
+      state: a.state as "on" | "off",
       scheduledAt: a.scheduledAt,
       executed: a.executed,
       enabled: a.enabled,
       createdAt: a.createdAt,
+      recurrenceType: (a.recurrenceType || "once") as "once" | "daily" | "weekly",
+      daysOfWeek: a.daysOfWeek ? (JSON.parse(a.daysOfWeek) as string[]) : [],
       user: a.user,
     }))
 
@@ -142,6 +237,7 @@ export const getAlarmsHandler = catchAsyncError(
     })
   },
 )
+
 export const getSingleAlarmHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const authUser = (req as any).user
@@ -160,7 +256,6 @@ export const getSingleAlarmHandler = catchAsyncError(
       return next(new ErrorHandler("Alarm not found", 404))
     }
 
-    // Access control: non-admin can only see their own alarm
     if (authUser.role !== "ADMIN" && alarm.userId !== authUser.id) {
       return next(new ErrorHandler("Forbidden", 403))
     }
@@ -169,11 +264,13 @@ export const getSingleAlarmHandler = catchAsyncError(
       id: alarm.id,
       userId: alarm.userId,
       devices: JSON.parse(alarm.deviceIds) as number[],
-      state: alarm.state,
+      state: alarm.state as "on" | "off",
       scheduledAt: alarm.scheduledAt,
       executed: alarm.executed,
       enabled: alarm.enabled,
       createdAt: alarm.createdAt,
+      recurrenceType: (alarm.recurrenceType || "once") as "once" | "daily" | "weekly",
+      daysOfWeek: alarm.daysOfWeek ? (JSON.parse(alarm.daysOfWeek) as string[]) : [],
       user: alarm.user,
     }
 
@@ -183,6 +280,7 @@ export const getSingleAlarmHandler = catchAsyncError(
     })
   },
 )
+
 export const toggleAlarmEnabledHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const authUser = (req as any).user
@@ -201,7 +299,6 @@ export const toggleAlarmEnabledHandler = catchAsyncError(
       return next(new ErrorHandler("Alarm not found", 404))
     }
 
-    // Only admin or owner can change
     if (authUser.role !== "ADMIN" && alarm.userId !== authUser.id) {
       return next(new ErrorHandler("Forbidden", 403))
     }
@@ -218,15 +315,21 @@ export const toggleAlarmEnabledHandler = catchAsyncError(
         id: updated.id,
         userId: updated.userId,
         devices: JSON.parse(updated.deviceIds) as number[],
-        state: updated.state,
+        state: updated.state as "on" | "off",
         scheduledAt: updated.scheduledAt,
         executed: updated.executed,
         enabled: updated.enabled,
         createdAt: updated.createdAt,
+        recurrenceType: (updated.recurrenceType || "once") as
+          | "once"
+          | "daily"
+          | "weekly",
+        daysOfWeek: updated.daysOfWeek ? (JSON.parse(updated.daysOfWeek) as string[]) : [],
       },
     })
   },
 )
+
 export const deleteAlarmHandler = catchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const authUser = (req as any).user

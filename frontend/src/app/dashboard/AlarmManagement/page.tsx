@@ -8,13 +8,14 @@ import { useUser } from "@/context/UserContext"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import {
   AlarmClock,
@@ -25,9 +26,12 @@ import {
   RefreshCcw,
   AlertTriangle,
   Trash2,
+  Repeat,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import SetAlarmModal from "@/components/dashboard/admin/components/set-alarm-modal"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@radix-ui/react-dialog"
+import { DialogHeader } from "@/components/ui/dialog"
 
 interface AlarmUser {
   id: number
@@ -46,6 +50,8 @@ interface Alarm {
   enabled: boolean
   createdAt: string
   user?: AlarmUser
+  recurrenceType?: "once" | "daily" | "weekly"
+  daysOfWeek?: string[]
 }
 
 export default function AlarmManagementPage() {
@@ -58,7 +64,11 @@ export default function AlarmManagementPage() {
   const [togglingId, setTogglingId] = useState<number | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
 
-  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false) // ⭐ NEW
+  const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false)
+
+  // NEW: filters
+  const [stateFilter, setStateFilter] = useState<"all" | "on" | "off">("all")
+  const [userIdFilter, setUserIdFilter] = useState<string>("")
 
   const isAdmin = userData?.role === "ADMIN"
 
@@ -67,6 +77,8 @@ export default function AlarmManagementPage() {
     try {
       const params: any = {}
       if (includeExecuted) params.includeExecuted = "true"
+      if (stateFilter !== "all") params.state = stateFilter
+      if (isAdmin && userIdFilter.trim()) params.userId = userIdFilter.trim()
 
       const res = await axios.get(`${Base_Url}/alarms/list`, {
         params,
@@ -88,7 +100,7 @@ export default function AlarmManagementPage() {
   useEffect(() => {
     fetchAlarms()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [includeExecuted])
+  }, [includeExecuted, stateFilter])
 
   const handleToggleEnabled = async (alarm: Alarm, newEnabled: boolean) => {
     setTogglingId(alarm.id)
@@ -171,6 +183,26 @@ export default function AlarmManagementPage() {
     }
   }
 
+  const formatRecurrence = (alarm: Alarm) => {
+    const type = alarm.recurrenceType || "once"
+    if (type === "daily") return "Every day"
+    if (type === "weekly") {
+      const days = alarm.daysOfWeek || []
+      if (!days.length) return "Weekly"
+      const map: Record<string, string> = {
+        sun: "Sun",
+        mon: "Mon",
+        tue: "Tue",
+        wed: "Wed",
+        thu: "Thu",
+        fri: "Fri",
+        sat: "Sat",
+      }
+      return `On ${days.map((d) => map[d] || d).join(", ")}`
+    }
+    return "One-time"
+  }
+
   return (
     <div className="m-10 space-y-6">
       {/* Header */}
@@ -183,11 +215,7 @@ export default function AlarmManagementPage() {
         </div>
 
         <div className="flex gap-2">
-          {/* ⭐ NEW: Set Alarm button */}
-          <Button
-            className="gap-2"
-            onClick={() => setIsAlarmModalOpen(true)}
-          >
+          <Button className="gap-2" onClick={() => setIsAlarmModalOpen(true)}>
             <Clock className="h-4 w-4" />
             Set Alarm
           </Button>
@@ -213,6 +241,36 @@ export default function AlarmManagementPage() {
             />
             <span className="text-sm">Show executed / past alarms</span>
           </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm">Alarm state:</span>
+            <Select
+              value={stateFilter}
+              onValueChange={(val) => setStateFilter(val as "all" | "on" | "off")}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="on">Only ON</SelectItem>
+                <SelectItem value="off">Only OFF</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm whitespace-nowrap">User ID:</span>
+              <Input
+                className="w-[140px]"
+                placeholder="e.g. 3"
+                value={userIdFilter}
+                onChange={(e) => setUserIdFilter(e.target.value)}
+              />
+              {/* uses Refresh button to apply */}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -250,6 +308,12 @@ export default function AlarmManagementPage() {
                         <CardDescription className="mt-1 text-xs">
                           {isOnAction ? "Turn devices ON" : "Turn devices OFF"}
                         </CardDescription>
+
+                        {/* NEW: recurrence info */}
+                        <div className="flex items-center gap-1 mt-1 text-[11px] text-muted-foreground">
+                          <Repeat className="h-3 w-3" />
+                          <span>{formatRecurrence(alarm)}</span>
+                        </div>
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
@@ -318,11 +382,7 @@ export default function AlarmManagementPage() {
 
                     {/* Actions row */}
                     <div className="flex items-center justify-between pt-2 border-t mt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDetails(alarm)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => openDetails(alarm)}>
                         Show alarm
                       </Button>
 
@@ -367,14 +427,23 @@ export default function AlarmManagementPage() {
                 </p>
               </div>
 
+              <div>
+                <p className="text-xs text-muted-foreground">Repeat</p>
+                <p className="font-medium">{formatRecurrence(selectedAlarm)}</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-muted-foreground">Scheduled At</p>
-                  <p className="font-medium">{formatDateTime(selectedAlarm.scheduledAt)}</p>
+                  <p className="font-medium">
+                    {formatDateTime(selectedAlarm.scheduledAt)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Created At</p>
-                  <p className="font-medium">{formatDateTime(selectedAlarm.createdAt)}</p>
+                  <p className="font-medium">
+                    {formatDateTime(selectedAlarm.createdAt)}
+                  </p>
                 </div>
               </div>
 
@@ -421,7 +490,7 @@ export default function AlarmManagementPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ⭐ Set Alarm Modal */}
+      {/* Set Alarm Modal */}
       <SetAlarmModal
         open={isAlarmModalOpen}
         onOpenChange={setIsAlarmModalOpen}

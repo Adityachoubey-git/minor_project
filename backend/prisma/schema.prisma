@@ -96,5 +96,8 @@ model Alarm {
   createdAt   DateTime   @default(now())
   enabled     Boolean    @default(true)
 
+   recurrenceType String   @default("once") // "once" | "daily" | "weekly"
+  daysOfWeek     String?  // JSON like '["mon","tue"]' (for weekly)
+
   user        user       @relation(fields: [userId], references: [id])
 }

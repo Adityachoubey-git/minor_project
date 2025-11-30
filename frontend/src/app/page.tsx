@@ -188,9 +188,13 @@ const handleLogin = async () => {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary via-primary to-accent flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-              ⚛️
-            </div>
+           <div className="w-20 h-20 rounded-[75px] border-2 border-white flex items-center justify-center shadow-lg overflow-hidden">
+  <img
+    src="labautonomylogo.jpeg"
+    alt="Lab Autonomy"
+    className="w-full h-full object-cover rounded-[75px] border-2 border-white"
+  />
+</div>
           </div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Lab Autonomy</h1>
           <p className="text-sm text-muted-foreground">Sign in to access your dashboard</p>

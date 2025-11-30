@@ -31,6 +31,16 @@ interface SetAlarmModalProps {
   selectedLabId?: string
 }
 
+const WEEK_DAYS = [
+  { key: "mon", label: "Mon" },
+  { key: "tue", label: "Tue" },
+  { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" },
+  { key: "fri", label: "Fri" },
+  { key: "sat", label: "Sat" },
+  { key: "sun", label: "Sun" },
+]
+
 export default function SetAlarmModal({
   open,
   onOpenChange,
@@ -44,6 +54,10 @@ export default function SetAlarmModal({
   const [state, setState] = useState<"on" | "off">("off")
   const [date, setDate] = useState("")
   const [time, setTime] = useState("")
+
+  const [recurrenceType, setRecurrenceType] = useState<"once" | "daily" | "weekly">("once")
+  const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState<string[]>([])
+
   const [loading, setLoading] = useState(false)
   const [fetchingData, setFetchingData] = useState(false)
 
@@ -53,13 +67,14 @@ export default function SetAlarmModal({
     const fetchLabsAndDevices = async () => {
       setFetchingData(true)
       try {
-        // Fetch labs
-        const labsRes = await axios.get(`${Base_Url}/lab/get`, { params: { limit: 100 }, withCredentials: true })
+        const labsRes = await axios.get(`${Base_Url}/lab/get`, {
+          params: { limit: 100 },
+          withCredentials: true,
+        })
         if (labsRes.data.success) {
           setLabs(labsRes.data.labs)
         }
 
-        // If a lab is already selected or passed as prop, fetch its devices
         if (selectedLabId) {
           const devicesRes = await axios.get(`${Base_Url}/devices/get`, {
             params: { labId: selectedLabId, limit: 100 },
@@ -71,7 +86,7 @@ export default function SetAlarmModal({
           }
         }
       } catch (error) {
-        console.error("[v0] Error fetching labs or devices:", error)
+        console.error("Error fetching labs or devices:", error)
         toast.error("Failed to load labs and devices")
       } finally {
         setFetchingData(false)
@@ -98,7 +113,7 @@ export default function SetAlarmModal({
           setDevices(devicesRes.data.devices)
         }
       } catch (error) {
-        console.error("[v0] Error fetching devices:", error)
+        console.error("Error fetching devices:", error)
         toast.error("Failed to load devices")
       } finally {
         setFetchingData(false)
@@ -109,7 +124,15 @@ export default function SetAlarmModal({
   }, [currentLabId])
 
   const toggleDeviceSelection = (deviceId: number) => {
-    setSelectedDevices((prev) => (prev.includes(deviceId) ? prev.filter((id) => id !== deviceId) : [...prev, deviceId]))
+    setSelectedDevices((prev) =>
+      prev.includes(deviceId) ? prev.filter((id) => id !== deviceId) : [...prev, deviceId],
+    )
+  }
+
+  const toggleDaySelection = (dayKey: string) => {
+    setSelectedDaysOfWeek((prev) =>
+      prev.includes(dayKey) ? prev.filter((d) => d !== dayKey) : [...prev, dayKey],
+    )
   }
 
   const handleSetAlarm = async () => {
@@ -119,6 +142,10 @@ export default function SetAlarmModal({
     }
     if (!date || !time) {
       toast.error("Please select both date and time")
+      return
+    }
+    if (recurrenceType === "weekly" && selectedDaysOfWeek.length === 0) {
+      toast.error("Please select at least one weekday for weekly repeat")
       return
     }
 
@@ -131,6 +158,8 @@ export default function SetAlarmModal({
           state,
           date,
           time,
+          recurrenceType,
+          daysOfWeek: recurrenceType === "weekly" ? selectedDaysOfWeek : undefined,
         },
         { withCredentials: true },
       )
@@ -141,10 +170,12 @@ export default function SetAlarmModal({
         setState("off")
         setDate("")
         setTime("")
+        setRecurrenceType("once")
+        setSelectedDaysOfWeek([])
         onOpenChange(false)
       }
     } catch (error: any) {
-      console.error("[v0] Error setting alarm:", error)
+      console.error("Error setting alarm:", error)
       toast.error(error.response?.data?.message || "Failed to set alarm")
     } finally {
       setLoading(false)
@@ -161,7 +192,9 @@ export default function SetAlarmModal({
               <Clock className="h-5 w-5" />
               Schedule Device Alarm
             </DialogTitle>
-            <DialogDescription>Set a scheduled time to turn devices ON or OFF</DialogDescription>
+            <DialogDescription>
+              Set a scheduled time to turn devices ON or OFF (one-time or repeating)
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
@@ -206,7 +239,7 @@ export default function SetAlarmModal({
               </div>
             </div>
 
-            {/* State Selection */}
+            {/* Device State */}
             <div>
               <label className="text-sm font-semibold mb-2 block">Device State</label>
               <Select value={state} onValueChange={(value) => setState(value as "on" | "off")}>
@@ -220,7 +253,47 @@ export default function SetAlarmModal({
               </Select>
             </div>
 
-            {/* Date and Time Selection */}
+            {/* Recurrence */}
+            <div className="space-y-3">
+              <label className="text-sm font-semibold block">Repeat</label>
+              <Select
+                value={recurrenceType}
+                onValueChange={(val) => setRecurrenceType(val as "once" | "daily" | "weekly")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="once">One-time</SelectItem>
+                  <SelectItem value="daily">Every day</SelectItem>
+                  <SelectItem value="weekly">Specific weekdays</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {recurrenceType === "weekly" && (
+                <div className="flex flex-wrap gap-2">
+                  {WEEK_DAYS.map((d) => {
+                    const active = selectedDaysOfWeek.includes(d.key)
+                    return (
+                      <button
+                        key={d.key}
+                        type="button"
+                        onClick={() => toggleDaySelection(d.key)}
+                        className={`px-3 py-1 rounded-full text-xs border transition ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-muted"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Date and Time */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-semibold mb-2 block">Date</label>
@@ -234,7 +307,12 @@ export default function SetAlarmModal({
 
             {/* Action Buttons */}
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="flex-1">
+              <Button
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={loading}
+                className="flex-1"
+              >
                 Cancel
               </Button>
               <Button onClick={handleSetAlarm} disabled={loading} className="flex-1">
